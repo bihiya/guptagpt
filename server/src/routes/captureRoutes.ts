@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireAuth } from '../middleware/auth.js';
 import { createCapture, listCaptures } from '../services/captureService.js';
 import type { CaptureRequestBody } from '../types.js';
 
@@ -29,7 +30,7 @@ function isValidPayload(body: Partial<CaptureRequestBody>): body is CaptureReque
   return !Number.isNaN(Date.parse(body.timestamp));
 }
 
-router.post('/capture', async (req, res, next) => {
+router.post('/capture', requireAuth, async (req, res, next) => {
   try {
     const body = req.body as Partial<CaptureRequestBody>;
     if (!isValidPayload(body)) {
@@ -37,18 +38,18 @@ router.post('/capture', async (req, res, next) => {
       return;
     }
 
-    const capture = await createCapture(body);
+    const capture = await createCapture(body, req.authUser!.id);
     res.status(201).json({ id: capture.id });
   } catch (error) {
     next(error);
   }
 });
 
-router.get('/captures', async (req, res, next) => {
+router.get('/captures', requireAuth, async (req, res, next) => {
   try {
     const limitValue = Number(req.query.limit ?? 20);
     const limit = Number.isFinite(limitValue) ? Math.min(Math.max(limitValue, 1), 100) : 20;
-    const captures = await listCaptures(limit);
+    const captures = await listCaptures(req.authUser!.id, limit);
     res.json({ items: captures });
   } catch (error) {
     next(error);

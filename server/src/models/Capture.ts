@@ -2,6 +2,7 @@ import { Schema, model } from 'mongoose';
 
 const captureSchema = new Schema(
   {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     url: { type: String, required: true },
     title: { type: String, required: true },
     html: { type: String, required: true },
@@ -12,6 +13,6 @@ const captureSchema = new Schema(
   { timestamps: true }
 );
 
-captureSchema.index({ createdAt: -1 });
+captureSchema.index({ userId: 1, createdAt: -1 });
 
 export const CaptureModel = model('Capture', captureSchema);

@@ -2,6 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import { connectDb } from './config/db.js';
 import { env } from './config/env.js';
+import authRoutes from './routes/authRoutes.js';
 import captureRoutes from './routes/captureRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
@@ -14,6 +15,7 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true, uptime: process.uptime() });
 });
 
+app.use('/api/auth', authRoutes);
 app.use('/api', captureRoutes);
 app.use(errorHandler);
 

@@ -1,5 +1,5 @@
 import type { CaptureDataMessage, CapturePayload } from '../types/messages';
-import { getSettings } from '../utils/storage';
+import { getSettings, setSettings } from '../utils/storage';
 
 let autoCaptureTimer: number | null = null;
 
@@ -54,7 +54,10 @@ async function captureAndSend(reason: 'command' | 'popup' | 'auto'): Promise<voi
 
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(settings.authToken ? { Authorization: `Bearer ${settings.authToken}` } : {})
+    },
     body: JSON.stringify(payload)
   });
 
@@ -111,6 +114,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   captureAndSend('popup')
+    .then(() => sendResponse({ ok: true }))
+    .catch((error: unknown) => sendResponse({ ok: false, error: String(error) }));
+
+  return true;
+});
+
+chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== 'SYNC_AUTH') {
+    return;
+  }
+
+  if (!sender.url) {
+    sendResponse({ ok: false, error: 'Missing sender URL' });
+    return;
+  }
+
+  setSettings({ authToken: String(message.token ?? '') })
     .then(() => sendResponse({ ok: true }))
     .catch((error: unknown) => sendResponse({ ok: false, error: String(error) }));
 

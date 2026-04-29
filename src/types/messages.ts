@@ -26,4 +26,5 @@ export interface ExtensionSettings {
   backendBaseUrl: string;
   autoModeEnabled: boolean;
   autoModeIntervalMs: number;
+  authToken: string;
 }
