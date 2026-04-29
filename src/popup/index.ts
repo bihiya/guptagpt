@@ -7,9 +7,8 @@ const saveBtn = document.getElementById('saveBtn') as HTMLButtonElement;
 const captureBtn = document.getElementById('captureBtn') as HTMLButtonElement;
 const statusEl = document.getElementById('status') as HTMLParagraphElement;
 
-function setStatus(message: string, isError = false): void {
+function setStatus(message: string): void {
   statusEl.textContent = message;
-  statusEl.style.color = isError ? '#b91c1c' : '#166534';
 }
 
 async function load(): Promise<void> {
@@ -22,29 +21,21 @@ async function load(): Promise<void> {
 saveBtn.addEventListener('click', async () => {
   try {
     const interval = Number(intervalInput.value);
-    const backendBaseUrl = backendBaseUrlInput.value.trim();
-    new URL(backendBaseUrl);
-
     await setSettings({
-      backendBaseUrl,
+      backendBaseUrl: backendBaseUrlInput.value.trim(),
       autoModeEnabled: autoModeCheckbox.checked,
-      autoModeIntervalMs: Number.isFinite(interval) ? Math.max(interval, 5000) : 15000
+      autoModeIntervalMs: Number.isFinite(interval) ? interval : 15000
     });
-    setStatus('Settings saved.');
+    setStatus('Saved.');
   } catch (error) {
-    setStatus(`Save failed: ${String(error)}`, true);
+    setStatus(`Failed to save: ${String(error)}`);
   }
 });
 
 captureBtn.addEventListener('click', async () => {
-  try {
-    setStatus('Capturing...');
-    const response = await chrome.runtime.sendMessage({ type: 'CAPTURE_NOW' });
-    if (!response?.ok) throw new Error(response?.error ?? 'Unknown error');
-    setStatus('Capture sent successfully.');
-  } catch (error) {
-    setStatus(`Capture failed: ${String(error)}`, true);
-  }
+  setStatus('Capturing...');
+  const response = await chrome.runtime.sendMessage({ type: 'CAPTURE_NOW' });
+  setStatus(response?.ok ? 'Capture sent.' : `Capture failed: ${response?.error ?? 'Unknown error'}`);
 });
 
-void load().catch((error: unknown) => setStatus(`Load failed: ${String(error)}`, true));
+load().catch((error: unknown) => setStatus(`Failed to load settings: ${String(error)}`));
