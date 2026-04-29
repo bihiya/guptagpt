@@ -1,6 +1,7 @@
 import { getSettings, setSettings } from '../utils/storage';
 
 const backendBaseUrlInput = document.getElementById('backendBaseUrl') as HTMLInputElement;
+const authTokenInput = document.getElementById('authToken') as HTMLInputElement;
 const intervalInput = document.getElementById('intervalMs') as HTMLInputElement;
 const autoModeCheckbox = document.getElementById('autoModeEnabled') as HTMLInputElement;
 const saveBtn = document.getElementById('saveBtn') as HTMLButtonElement;
@@ -14,6 +15,7 @@ function setStatus(message: string): void {
 async function load(): Promise<void> {
   const settings = await getSettings();
   backendBaseUrlInput.value = settings.backendBaseUrl;
+  authTokenInput.value = settings.authToken;
   intervalInput.value = String(settings.autoModeIntervalMs);
   autoModeCheckbox.checked = settings.autoModeEnabled;
 }
@@ -23,8 +25,9 @@ saveBtn.addEventListener('click', async () => {
     const interval = Number(intervalInput.value);
     await setSettings({
       backendBaseUrl: backendBaseUrlInput.value.trim(),
+      authToken: authTokenInput.value.trim(),
       autoModeEnabled: autoModeCheckbox.checked,
-      autoModeIntervalMs: Number.isFinite(interval) ? interval : 15000
+      autoModeIntervalMs: Number.isFinite(interval) ? interval : 15000,
     });
     setStatus('Saved.');
   } catch (error) {

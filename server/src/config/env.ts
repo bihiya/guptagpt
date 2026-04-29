@@ -13,12 +13,20 @@ const atlasUri =
     ? `mongodb+srv://${encodeURIComponent(mongoUser)}:${encodeURIComponent(mongoPassword)}@${mongoCluster}/${mongoDbName}?retryWrites=true&w=majority&appName=CapturePlatform`
     : '';
 
+const jwtSecret = process.env.JWT_SECRET ?? '';
+
 export const env = {
   port: Number(process.env.PORT ?? 3000),
   mongoUri: mongoUri || atlasUri,
-  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173'
+  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+  jwtSecret,
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d'
 };
 
 if (!env.mongoUri) {
   throw new Error('MONGODB_URI is required, or provide MONGODB_USER, MONGODB_PASSWORD, and MONGODB_CLUSTER.');
+}
+
+if (!env.jwtSecret) {
+  throw new Error('JWT_SECRET is required.');
 }

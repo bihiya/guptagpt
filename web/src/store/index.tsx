@@ -40,7 +40,7 @@ function capturesReducer(state: CapturesState, action: CapturesAction): Captures
 interface StoreContextValue {
   state: CapturesState;
   dispatch: Dispatch<CapturesAction>;
-  loadCaptures: () => Promise<void>;
+  loadCaptures: (token: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -48,10 +48,15 @@ const StoreContext = createContext<StoreContextValue | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(capturesReducer, initialState);
 
-  const loadCaptures = async () => {
+  const loadCaptures = async (token: string) => {
+    if (!token) {
+      dispatch({ type: 'load/error', payload: 'Please login first' });
+      return;
+    }
+
     dispatch({ type: 'load/start' });
     try {
-      const items = await fetchCaptures();
+      const items = await fetchCaptures(token);
       dispatch({ type: 'load/success', payload: items });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load captures';
