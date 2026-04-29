@@ -6,7 +6,7 @@ import type { AuthRequestBody } from '../types.js';
 const router = Router();
 
 function valid(body: Partial<AuthRequestBody>): body is AuthRequestBody {
-  return Boolean(body.username?.trim()) && Boolean(body.password) && body.password.length >= 6;
+  return Boolean(body.username?.trim()) && typeof body.password === 'string' && body.password.length >= 6;
 }
 
 router.post('/signup', async (req, res, next) => {

@@ -1,11 +1,9 @@
-import type { CaptureDataMessage } from '../types/messages';
-
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || message.type !== 'CAPTURE_REQUEST') {
     return;
   }
 
-  const payload: CaptureDataMessage = {
+  const payload = {
     type: 'CAPTURE_DATA',
     tabId: -1,
     url: window.location.href,
@@ -13,7 +11,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     html: document.documentElement.outerHTML,
     timestamp: new Date().toISOString(),
     reason: message.reason
-  };
+  } as const;
 
   sendResponse(payload);
 });
