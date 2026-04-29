@@ -1,5 +1,5 @@
-import type { ExtensionSettings } from '../types/messages';
-import { DEFAULT_SETTINGS, STORAGE_KEY } from './constants';
+import type { ExtensionSettings } from '../types/messages.js';
+import { DEFAULT_SETTINGS, STORAGE_KEY } from './constants.js';
 
 export async function getSettings(): Promise<ExtensionSettings> {
   const stored = await chrome.storage.sync.get(STORAGE_KEY);
