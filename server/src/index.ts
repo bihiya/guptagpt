@@ -7,7 +7,25 @@ import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 
-app.use(cors({ origin: env.corsOrigin }));
+const allowedOrigins = new Set(
+  env.corsOrigin
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin) || origin.startsWith('chrome-extension://')) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('Origin not allowed by CORS'));
+    }
+  })
+);
 app.use(express.json({ limit: '25mb' }));
 
 app.get('/health', (_req, res) => {

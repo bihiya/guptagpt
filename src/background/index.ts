@@ -1,5 +1,5 @@
 import type { CaptureDataMessage, CapturePayload } from '../types/messages';
-import { getSettings } from '../utils/storage';
+import { getSettings } from '../utils/storage.js';
 
 let autoCaptureTimer: number | null = null;
 

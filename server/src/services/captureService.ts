@@ -9,5 +9,9 @@ export async function createCapture(payload: CaptureRequestBody) {
 }
 
 export async function listCaptures(limit = 20) {
-  return CaptureModel.find().sort({ createdAt: -1 }).limit(limit).lean();
+  return CaptureModel.find()
+    .select('_id url title reason timestamp createdAt updatedAt')
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .lean();
 }
