@@ -11,6 +11,9 @@
 3. Run:
    - `cd server && npm install && npm run dev`
 
+For local development without a MongoDB service, run:
+- `cd server && npm install && npm run dev:memory`
+
 ## Frontend
 - `cd web && npm install && npm run dev`
 
