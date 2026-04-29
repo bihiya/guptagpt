@@ -47,6 +47,7 @@ async function captureAndSend(reason: 'command' | 'popup' | 'auto'): Promise<voi
     url: captureData.url,
     title: captureData.title,
     html: captureData.html,
+    sourceCode: captureData.sourceCode,
     screenshotBase64,
     timestamp: captureData.timestamp,
     reason

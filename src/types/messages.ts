@@ -9,6 +9,7 @@ export interface CaptureDataMessage {
   url: string;
   title: string;
   html: string;
+  sourceCode: string;
   timestamp: string;
   reason: 'command' | 'popup' | 'auto';
 }
@@ -17,6 +18,7 @@ export interface CapturePayload {
   url: string;
   title: string;
   html: string;
+  sourceCode: string;
   screenshotBase64: string;
   timestamp: string;
   reason: 'command' | 'popup' | 'auto';
