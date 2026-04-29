@@ -1,4 +1,4 @@
-import { getSettings, setSettings } from '../utils/storage';
+import { getSettings, setSettings } from '../utils/storage.js';
 
 const backendBaseUrlInput = document.getElementById('backendBaseUrl') as HTMLInputElement;
 const authTokenInput = document.getElementById('authToken') as HTMLInputElement;

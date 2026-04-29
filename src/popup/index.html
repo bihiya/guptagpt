@@ -3,37 +3,54 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Capture Settings</title>
+    <title>Capture Studio</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main>
-      <h1>Capture Settings</h1>
-      <label>
-        Backend Base URL
-        <input id="backendBaseUrl" type="url" placeholder="https://api.example.com" />
-      </label>
+    <main class="panel">
+      <section class="hero">
+        <div class="badge">Page Capture</div>
+        <h1>Capture Studio</h1>
+        <p>Save the tab photo, full HTML, and source code in one click.</p>
+        <button id="captureBtn" class="capture-button" type="button">
+          <span aria-hidden="true">●</span>
+          Capture current tab
+        </button>
+      </section>
 
-      <label>
-        Auth Token (Bearer)
-        <input id="authToken" type="password" placeholder="paste JWT token" />
-      </label>
+      <section class="card">
+        <div class="section-title">
+          <span>Connection</span>
+          <small>Sync settings</small>
+        </div>
 
-      <label>
-        Auto-mode interval (ms)
-        <input id="intervalMs" type="number" min="5000" step="1000" />
-      </label>
+        <label>
+          Backend Base URL
+          <input id="backendBaseUrl" type="url" placeholder="https://api.example.com" />
+        </label>
 
-      <label class="inline">
-        <input id="autoModeEnabled" type="checkbox" />
-        Enable auto-mode
-      </label>
+        <label>
+          Auth Token (Bearer)
+          <input id="authToken" type="password" placeholder="Paste JWT token" />
+        </label>
 
-      <div class="actions">
-        <button id="saveBtn">Save</button>
-        <button id="captureBtn" type="button">Capture Now</button>
-      </div>
-      <p id="status" role="status"></p>
+        <label>
+          Auto-mode interval (ms)
+          <input id="intervalMs" type="number" min="5000" step="1000" />
+        </label>
+
+        <label class="toggle-row">
+          <input id="autoModeEnabled" type="checkbox" />
+          <span>
+            <strong>Auto-mode</strong>
+            <small>Capture on a repeating schedule.</small>
+          </span>
+        </label>
+
+        <button id="saveBtn" class="save-button">Save settings</button>
+      </section>
+
+      <p id="status" class="status" role="status">Ready to capture.</p>
     </main>
     <script type="module" src="index.js"></script>
   </body>

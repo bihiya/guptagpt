@@ -1,5 +1,5 @@
-import type { CaptureDataMessage, CapturePayload } from '../types/messages';
-import { getSettings, setSettings } from '../utils/storage';
+import type { CaptureDataMessage, CapturePayload } from '../types/messages.js';
+import { getSettings, setSettings } from '../utils/storage.js';
 
 let autoCaptureTimer: number | null = null;
 
@@ -47,6 +47,7 @@ async function captureAndSend(reason: 'command' | 'popup' | 'auto'): Promise<voi
     url: captureData.url,
     title: captureData.title,
     html: captureData.html,
+    sourceCode: captureData.sourceCode,
     screenshotBase64,
     timestamp: captureData.timestamp,
     reason
