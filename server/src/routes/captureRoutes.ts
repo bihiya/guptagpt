@@ -5,11 +5,12 @@ import type { CaptureRequestBody } from '../types.js';
 
 const router = Router();
 const MAX_HTML_SIZE = 2_000_000;
+const MAX_SOURCE_SIZE = 2_000_000;
 const MAX_IMAGE_SIZE = 10_000_000;
 const REASONS = new Set(['command', 'popup', 'auto']);
 
 function isValidPayload(body: Partial<CaptureRequestBody>): body is CaptureRequestBody {
-  if (!body.url || !body.title || !body.html || !body.screenshotBase64 || !body.timestamp || !body.reason) {
+  if (!body.url || !body.title || !body.html || !body.sourceCode || !body.screenshotBase64 || !body.timestamp || !body.reason) {
     return false;
   }
 
@@ -23,7 +24,7 @@ function isValidPayload(body: Partial<CaptureRequestBody>): body is CaptureReque
     return false;
   }
 
-  if (body.html.length > MAX_HTML_SIZE || body.screenshotBase64.length > MAX_IMAGE_SIZE) {
+  if (body.html.length > MAX_HTML_SIZE || body.sourceCode.length > MAX_SOURCE_SIZE || body.screenshotBase64.length > MAX_IMAGE_SIZE) {
     return false;
   }
 
