@@ -1,36 +1,91 @@
 import bcrypt from 'bcryptjs';
+import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { Types } from 'mongoose';
 import { env } from '../config/env.js';
 import { UserModel } from '../models/User.js';
 import type { JwtPayload } from '../types.js';
 
-function signToken(userId: Types.ObjectId, username: string): string {
-  return jwt.sign({ sub: userId.toString(), username }, env.jwtSecret, { expiresIn: env.jwtExpiresIn as jwt.SignOptions['expiresIn'] });
+const googleClient = new OAuth2Client();
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
 }
 
-export async function signup(username: string, password: string) {
-  const normalized = username.trim().toLowerCase();
-  const exists = await UserModel.findOne({ username: normalized }).lean();
+function assertValidEmail(email: string): void {
+  if (!emailRegex.test(email)) {
+    throw new Error('INVALID_EMAIL');
+  }
+}
+
+function usernameFromEmail(email: string): string {
+  return email.split('@')[0] ?? 'user';
+}
+
+function signToken(userId: Types.ObjectId, email: string): string {
+  return jwt.sign({ sub: userId.toString(), email }, env.jwtSecret, { expiresIn: env.jwtExpiresIn as jwt.SignOptions['expiresIn'] });
+}
+
+export async function signup(email: string, password: string) {
+  const normalizedEmail = normalizeEmail(email);
+  assertValidEmail(normalizedEmail);
+  const exists = await UserModel.findOne({ email: normalizedEmail }).lean();
   if (exists) throw new Error('USERNAME_EXISTS');
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await UserModel.create({ username: normalized, passwordHash });
-  const token = signToken(user._id, user.username);
+  const user = await UserModel.create({
+    username: usernameFromEmail(normalizedEmail),
+    email: normalizedEmail,
+    passwordHash
+  });
+  const token = signToken(user._id, user.email);
 
-  return { token, user: { id: user._id.toString(), username: user.username } };
+  return { token, user: { id: user._id.toString(), username: user.username ?? user.email, email: user.email } };
 }
 
-export async function login(username: string, password: string) {
-  const normalized = username.trim().toLowerCase();
-  const user = await UserModel.findOne({ username: normalized });
+export async function login(email: string, password: string) {
+  const normalizedEmail = normalizeEmail(email);
+  assertValidEmail(normalizedEmail);
+  const user = await UserModel.findOne({ email: normalizedEmail });
   if (!user) throw new Error('INVALID_CREDENTIALS');
+  if (!user.passwordHash) throw new Error('PASSWORD_LOGIN_DISABLED');
 
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) throw new Error('INVALID_CREDENTIALS');
 
-  const token = signToken(user._id, user.username);
-  return { token, user: { id: user._id.toString(), username: user.username } };
+  const token = signToken(user._id, user.email);
+  return { token, user: { id: user._id.toString(), username: user.username ?? user.email, email: user.email } };
+}
+
+export async function loginWithGoogle(idToken: string) {
+  if (!env.googleClientId) {
+    throw new Error('GOOGLE_AUTH_NOT_CONFIGURED');
+  }
+
+  const ticket = await googleClient.verifyIdToken({
+    idToken,
+    audience: env.googleClientId
+  });
+
+  const payload = ticket.getPayload();
+  const email = normalizeEmail(payload?.email ?? '');
+  const emailVerified = payload?.email_verified === true;
+
+  if (!email || !emailVerified) {
+    throw new Error('INVALID_GOOGLE_TOKEN');
+  }
+
+  let user = await UserModel.findOne({ email });
+  if (!user) {
+    user = await UserModel.create({
+      email,
+      username: usernameFromEmail(email)
+    });
+  }
+
+  const token = signToken(user._id, user.email);
+  return { token, user: { id: user._id.toString(), username: user.username ?? user.email, email: user.email } };
 }
 
 export function verifyToken(token: string): JwtPayload {

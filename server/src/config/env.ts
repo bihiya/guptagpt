@@ -20,7 +20,8 @@ export const env = {
   mongoUri: mongoUri || atlasUri,
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
   jwtSecret,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d'
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
+  googleClientId: process.env.GOOGLE_CLIENT_ID ?? ''
 };
 
 if (!env.mongoUri) {

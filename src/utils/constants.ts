@@ -4,7 +4,8 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   backendBaseUrl: 'http://localhost:3000',
   autoModeEnabled: false,
   autoModeIntervalMs: 15000,
-  authToken: ''
+  authToken: '',
+  popupCaptureShortcut: 'Ctrl+Shift+Y'
 };
 
 export const STORAGE_KEY = 'captureSettings';

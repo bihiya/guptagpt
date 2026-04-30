@@ -9,11 +9,15 @@ export interface CaptureRequestBody {
 }
 
 export interface AuthRequestBody {
-  username: string;
+  email: string;
   password: string;
 }
 
 export interface JwtPayload {
   sub: string;
-  username: string;
+  email: string;
+}
+
+export interface GoogleAuthRequestBody {
+  idToken: string;
 }

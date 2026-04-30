@@ -2,6 +2,7 @@ import { getSettings, setSettings } from '../utils/storage.js';
 
 const backendBaseUrlInput = document.getElementById('backendBaseUrl') as HTMLInputElement;
 const intervalInput = document.getElementById('intervalMs') as HTMLInputElement;
+const popupCaptureShortcutInput = document.getElementById('popupCaptureShortcut') as HTMLInputElement;
 const autoModeCheckbox = document.getElementById('autoModeEnabled') as HTMLInputElement;
 const saveBtn = document.getElementById('saveBtn') as HTMLButtonElement;
 const captureBtn = document.getElementById('captureBtn') as HTMLButtonElement;
@@ -11,28 +12,33 @@ function setStatus(message: string): void {
   statusEl.textContent = message;
 }
 
-async function load(): Promise<void> {
-  const settings = await getSettings();
-  backendBaseUrlInput.value = settings.backendBaseUrl;
-  intervalInput.value = String(settings.autoModeIntervalMs);
-  autoModeCheckbox.checked = settings.autoModeEnabled;
+function normalizeShortcut(shortcut: string): string {
+  return shortcut
+    .trim()
+    .replace(/\s+/g, '')
+    .split('+')
+    .filter(Boolean)
+    .map((part) => {
+      const lower = part.toLowerCase();
+      if (lower === 'control') return 'ctrl';
+      if (lower === 'cmd' || lower === 'command') return 'meta';
+      if (lower === 'option') return 'alt';
+      return lower;
+    })
+    .join('+');
 }
 
-saveBtn.addEventListener('click', async () => {
-  try {
-    const interval = Number(intervalInput.value);
-    await setSettings({
-      backendBaseUrl: backendBaseUrlInput.value.trim(),
-      autoModeEnabled: autoModeCheckbox.checked,
-      autoModeIntervalMs: Number.isFinite(interval) ? interval : 15000,
-    });
-    setStatus('Saved.');
-  } catch (error) {
-    setStatus(`Failed to save: ${String(error)}`);
-  }
-});
+function eventToShortcut(event: KeyboardEvent): string {
+  const parts: string[] = [];
+  if (event.ctrlKey) parts.push('ctrl');
+  if (event.metaKey) parts.push('meta');
+  if (event.altKey) parts.push('alt');
+  if (event.shiftKey) parts.push('shift');
+  parts.push(event.key.toLowerCase());
+  return parts.join('+');
+}
 
-captureBtn.addEventListener('click', async () => {
+async function triggerCapture(): Promise<void> {
   setStatus('Capturing...');
   try {
     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -46,6 +52,49 @@ captureBtn.addEventListener('click', async () => {
     setStatus(response?.ok ? 'Capture sent.' : `Capture failed: ${response?.error ?? 'Unknown error'}`);
   } catch (error) {
     setStatus(`Capture failed: ${String(error)}`);
+  }
+}
+
+async function load(): Promise<void> {
+  const settings = await getSettings();
+  backendBaseUrlInput.value = settings.backendBaseUrl;
+  intervalInput.value = String(settings.autoModeIntervalMs);
+  popupCaptureShortcutInput.value = settings.popupCaptureShortcut;
+  autoModeCheckbox.checked = settings.autoModeEnabled;
+}
+
+saveBtn.addEventListener('click', async () => {
+  try {
+    const interval = Number(intervalInput.value);
+    await setSettings({
+      backendBaseUrl: backendBaseUrlInput.value.trim(),
+      autoModeEnabled: autoModeCheckbox.checked,
+      autoModeIntervalMs: Number.isFinite(interval) ? interval : 15000,
+      popupCaptureShortcut: popupCaptureShortcutInput.value.trim(),
+    });
+    setStatus('Saved.');
+  } catch (error) {
+    setStatus(`Failed to save: ${String(error)}`);
+  }
+});
+
+captureBtn.addEventListener('click', () => {
+  void triggerCapture();
+});
+
+document.addEventListener('keydown', async (event) => {
+  const target = event.target as HTMLElement | null;
+  if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') {
+    return;
+  }
+
+  const settings = await getSettings();
+  const configured = normalizeShortcut(settings.popupCaptureShortcut);
+  if (!configured) return;
+
+  if (eventToShortcut(event) === configured) {
+    event.preventDefault();
+    void triggerCapture();
   }
 });
 
