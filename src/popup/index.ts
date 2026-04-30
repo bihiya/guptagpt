@@ -1,6 +1,5 @@
 import { getSettings, setSettings } from '../utils/storage.js';
 
-const backendBaseUrlInput = document.getElementById('backendBaseUrl') as HTMLInputElement;
 const intervalInput = document.getElementById('intervalMs') as HTMLInputElement;
 const popupCaptureShortcutInput = document.getElementById('popupCaptureShortcut') as HTMLInputElement;
 const autoModeCheckbox = document.getElementById('autoModeEnabled') as HTMLInputElement;
@@ -57,7 +56,6 @@ async function triggerCapture(): Promise<void> {
 
 async function load(): Promise<void> {
   const settings = await getSettings();
-  backendBaseUrlInput.value = settings.backendBaseUrl;
   intervalInput.value = String(settings.autoModeIntervalMs);
   popupCaptureShortcutInput.value = settings.popupCaptureShortcut;
   autoModeCheckbox.checked = settings.autoModeEnabled;
@@ -67,7 +65,6 @@ saveBtn.addEventListener('click', async () => {
   try {
     const interval = Number(intervalInput.value);
     await setSettings({
-      backendBaseUrl: backendBaseUrlInput.value.trim(),
       autoModeEnabled: autoModeCheckbox.checked,
       autoModeIntervalMs: Number.isFinite(interval) ? interval : 15000,
       popupCaptureShortcut: popupCaptureShortcutInput.value.trim(),

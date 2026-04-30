@@ -11,7 +11,9 @@ const app = express();
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || env.corsOrigins.includes(origin)) {
+      const isChromeExtensionOrigin = Boolean(origin?.startsWith('chrome-extension://'));
+
+      if (!origin || env.corsOrigins.includes(origin) || isChromeExtensionOrigin) {
         callback(null, true);
         return;
       }
