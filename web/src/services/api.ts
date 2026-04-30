@@ -32,17 +32,24 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 }
 
-export async function signup(username: string, password: string) {
+export async function signup(email: string, password: string) {
   return request<AuthResponse>('/api/auth/signup', {
     method: 'POST',
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ email, password }),
   });
 }
 
-export async function login(username: string, password: string) {
+export async function login(email: string, password: string) {
   return request<AuthResponse>('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function loginWithGoogle(idToken: string) {
+  return request<AuthResponse>('/api/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ idToken }),
   });
 }
 

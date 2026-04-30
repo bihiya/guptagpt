@@ -7,14 +7,18 @@
 
 ## Backend
 1. Copy `server/.env.example` to `server/.env`
-2. Set MongoDB URI
-3. Run:
+2. Set MongoDB URI and `JWT_SECRET`
+3. (Optional) set `GOOGLE_CLIENT_ID` to enable Google login
+4. Run:
    - `cd server && npm install && npm run dev`
 
 For local development without a MongoDB service, run:
 - `cd server && npm install && npm run dev:memory`
 
 ## Frontend
+- Copy `web/.env.example` to `web/.env`
+- Set `VITE_EXTENSION_ID`
+- (Optional) set `VITE_GOOGLE_CLIENT_ID` to show Google login
 - `cd web && npm install && npm run dev`
 
 ## Chrome Extension

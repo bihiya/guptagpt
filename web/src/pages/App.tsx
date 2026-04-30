@@ -35,7 +35,7 @@ export function App() {
         <nav className="top-actions" aria-label="Account actions">
           {isLoggedIn ? (
             <>
-              <span>{savedAuth?.username}</span>
+              <span>{savedAuth?.email ?? savedAuth?.username}</span>
               <button onClick={() => void loadCaptures(savedAuth?.token ?? '')}>Refresh</button>
               <button className="secondary" onClick={handleLogout}>Logout</button>
             </>

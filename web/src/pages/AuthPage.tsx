@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { APP_CONFIG } from '../config';
 import { saveAuth } from '../auth';
 import { navigate } from '../router';
-import { login, signup } from '../services/api';
+import { login, loginWithGoogle, signup } from '../services/api';
 
 type AuthMode = 'login' | 'signup';
 
@@ -11,10 +11,11 @@ interface AuthPageProps {
 }
 
 export function AuthPage({ mode }: AuthPageProps) {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState('');
   const isSignup = mode === 'signup';
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
 
   const syncTokenToExtension = async (nextToken: string) => {
     if (!(window as Window & { chrome?: typeof chrome }).chrome?.runtime || !APP_CONFIG.extensionId) {
@@ -38,14 +39,60 @@ export function AuthPage({ mode }: AuthPageProps) {
     setStatus(isSignup ? 'Creating account...' : 'Signing in...');
 
     try {
-      const result = isSignup ? await signup(username, password) : await login(username, password);
-      saveAuth({ username: result.user.username, token: result.token });
+      const result = isSignup ? await signup(email, password) : await login(email, password);
+      saveAuth({ username: result.user.username, email: result.user.email, token: result.token });
       await syncTokenToExtension(result.token);
       navigate('/');
     } catch (authError) {
       setStatus(authError instanceof Error ? authError.message : 'Authentication failed');
     }
   };
+
+  useEffect(() => {
+    if (!APP_CONFIG.googleClientId || window.google?.accounts?.id) {
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    if (!APP_CONFIG.googleClientId || !googleButtonRef.current || !window.google?.accounts?.id) {
+      return;
+    }
+
+    const handleCredentialResponse = async (response: { credential?: string }) => {
+      if (!response.credential) {
+        setStatus('Google login failed: missing credential');
+        return;
+      }
+
+      try {
+        setStatus('Signing in with Google...');
+        const result = await loginWithGoogle(response.credential);
+        saveAuth({ username: result.user.username, email: result.user.email, token: result.token });
+        await syncTokenToExtension(result.token);
+        navigate('/');
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : 'Google authentication failed');
+      }
+    };
+
+    window.google.accounts.id.initialize({
+      client_id: APP_CONFIG.googleClientId,
+      callback: handleCredentialResponse
+    });
+    googleButtonRef.current.innerHTML = '';
+    window.google.accounts.id.renderButton(googleButtonRef.current, {
+      theme: 'outline',
+      size: 'large',
+      width: 320,
+      text: isSignup ? 'signup_with' : 'signin_with'
+    });
+  }, [isSignup]);
 
   return (
     <main className="auth-shell">
@@ -58,8 +105,8 @@ export function AuthPage({ mode }: AuthPageProps) {
 
         <form className="auth-form stacked" onSubmit={(event) => void handleAuth(event)}>
           <label>
-            Username
-            <input placeholder="alex" value={username} onChange={(event) => setUsername(event.target.value)} required />
+            Email
+            <input type="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} required />
           </label>
           <label>
             Password
@@ -67,6 +114,13 @@ export function AuthPage({ mode }: AuthPageProps) {
           </label>
           <button type="submit">{isSignup ? 'Create account' : 'Login'}</button>
         </form>
+
+        {APP_CONFIG.googleClientId && (
+          <div className="stacked">
+            <p className="muted">or continue with Google</p>
+            <div ref={googleButtonRef} />
+          </div>
+        )}
 
         {status && <p className="status">{status}</p>}
         <p className="auth-link">
