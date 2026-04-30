@@ -18,7 +18,10 @@ const jwtSecret = process.env.JWT_SECRET ?? '';
 export const env = {
   port: Number(process.env.PORT ?? 3000),
   mongoUri: mongoUri || atlasUri,
-  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+  corsOrigins: (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   jwtSecret,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? ''
