@@ -3,36 +3,60 @@ import { getSettings, setSettings } from '../utils/storage.js';
 
 let autoCaptureTimer: number | null = null;
 
+function isCapturableUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  return /^https?:\/\//i.test(url);
+}
+
 async function getActiveTab(): Promise<chrome.tabs.Tab> {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   const tab = tabs[0];
   if (!tab?.id || !tab.windowId) {
     throw new Error('No active tab found.');
   }
-  return tab;
-}
-
-async function ensureContentScript(tabId: number): Promise<void> {
-  try {
-    await chrome.tabs.sendMessage(tabId, { type: 'PING' });
-  } catch {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ['content/index.js']
-    });
+  if (!isCapturableUrl(tab.url)) {
+    throw new Error('This tab cannot be captured. Open an http(s) page and try again.');
   }
+  return tab;
 }
 
 async function captureAndSend(reason: 'command' | 'popup' | 'auto'): Promise<void> {
   const tab = await getActiveTab();
   const tabId = tab.id as number;
 
-  await ensureContentScript(tabId);
+  let captureData: CaptureDataMessage;
+  try {
+    captureData = (await chrome.tabs.sendMessage(tabId, {
+      type: 'CAPTURE_REQUEST',
+      reason
+    })) as CaptureDataMessage;
+  } catch {
+    // Some pages do not have an attached content-script receiver yet.
+    // Fall back to one-off script execution in the active tab.
+    const result = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (nextReason: 'command' | 'popup' | 'auto') => {
+        const fullHtml = document.documentElement.outerHTML;
+        return {
+          type: 'CAPTURE_DATA' as const,
+          tabId: -1,
+          url: window.location.href,
+          title: document.title,
+          html: fullHtml,
+          sourceCode: fullHtml,
+          timestamp: new Date().toISOString(),
+          reason: nextReason
+        };
+      },
+      args: [reason]
+    });
 
-  const captureData = (await chrome.tabs.sendMessage(tabId, {
-    type: 'CAPTURE_REQUEST',
-    reason
-  })) as CaptureDataMessage;
+    const fallbackPayload = result[0]?.result;
+    if (!fallbackPayload) {
+      throw new Error('Unable to read page HTML from active tab.');
+    }
+    captureData = fallbackPayload;
+  }
 
   const screenshotDataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
     format: 'png'

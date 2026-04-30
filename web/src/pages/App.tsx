@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { AUTH_KEY, getSavedAuth } from '../auth';
 import { CaptureList } from '../components/CaptureList';
+import { navigate } from '../router';
 import { selectFilteredCaptures, useStore } from '../store';
 
 export function App() {
@@ -21,7 +22,7 @@ export function App() {
 
   const handleLogout = () => {
     localStorage.removeItem(AUTH_KEY);
-    window.location.assign('/login');
+    navigate('/login');
   };
 
   return (
@@ -40,8 +41,14 @@ export function App() {
             </>
           ) : (
             <>
-              <a className="button-link" href="/login">Login</a>
-              <a className="button-link secondary" href="/signup">Sign up</a>
+              <a className="button-link" href="/login" onClick={(event) => {
+                event.preventDefault();
+                navigate('/login');
+              }}>Login</a>
+              <a className="button-link secondary" href="/signup" onClick={(event) => {
+                event.preventDefault();
+                navigate('/signup');
+              }}>Sign up</a>
             </>
           )}
         </nav>

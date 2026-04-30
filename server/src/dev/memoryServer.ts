@@ -1,6 +1,11 @@
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
+const mongoBinaryVersion = process.env.MONGOMS_VERSION ?? '7.0.14';
+
 const mongo = await MongoMemoryServer.create({
+  binary: {
+    version: mongoBinaryVersion
+  },
   instance: {
     dbName: process.env.MONGODB_DB_NAME ?? 'capture_extension'
   }

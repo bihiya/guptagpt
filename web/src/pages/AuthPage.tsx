@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { APP_CONFIG } from '../config';
 import { saveAuth } from '../auth';
+import { navigate } from '../router';
 import { login, signup } from '../services/api';
 
 type AuthMode = 'login' | 'signup';
@@ -40,8 +41,7 @@ export function AuthPage({ mode }: AuthPageProps) {
       const result = isSignup ? await signup(username, password) : await login(username, password);
       saveAuth({ username: result.user.username, token: result.token });
       await syncTokenToExtension(result.token);
-      window.history.pushState({}, '', '/');
-      window.dispatchEvent(new PopStateEvent('popstate'));
+      navigate('/');
     } catch (authError) {
       setStatus(authError instanceof Error ? authError.message : 'Authentication failed');
     }
@@ -71,7 +71,15 @@ export function AuthPage({ mode }: AuthPageProps) {
         {status && <p className="status">{status}</p>}
         <p className="auth-link">
           {isSignup ? 'Already have an account?' : 'Need an account?'}{' '}
-          <a href={isSignup ? '/login' : '/signup'}>{isSignup ? 'Login' : 'Sign up'}</a>
+          <a
+            href={isSignup ? '/login' : '/signup'}
+            onClick={(event) => {
+              event.preventDefault();
+              navigate(isSignup ? '/login' : '/signup');
+            }}
+          >
+            {isSignup ? 'Login' : 'Sign up'}
+          </a>
         </p>
       </section>
     </main>
