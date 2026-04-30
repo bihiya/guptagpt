@@ -1,4 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Divider,
+  Link,
+  Stack,
+  TextField,
+  Typography
+} from '@mui/material';
 import { APP_CONFIG } from '../config';
 import { saveAuth } from '../auth';
 import { navigate } from '../router';
@@ -95,47 +107,86 @@ export function AuthPage({ mode }: AuthPageProps) {
   }, [isSignup]);
 
   return (
-    <main className="auth-shell">
-      <section className="auth-panel">
-        <p className="eyebrow">Capture Dashboard</p>
-        <h1>{isSignup ? 'Create your account' : 'Welcome back'}</h1>
-        <p className="muted">
-          {isSignup ? 'Sign up to sync extension captures to this dashboard.' : 'Log in to review photos, HTML, and source code captured by the extension.'}
-        </p>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        px: 2,
+        py: 6,
+        background: 'linear-gradient(135deg, #f8fbff 0%, #eef3ff 45%, #f3efff 100%)'
+      }}
+    >
+      <Card elevation={6} sx={{ width: '100%', maxWidth: 460, borderRadius: 4 }}>
+        <CardContent sx={{ p: 4 }}>
+          <Stack spacing={3}>
+            <Box>
+              <Typography variant="overline" sx={{ color: 'primary.main', letterSpacing: 1.2 }}>
+                Capture Dashboard
+              </Typography>
+              <Typography variant="h4" fontWeight={700} gutterBottom>
+                {isSignup ? 'Create your account' : 'Welcome back'}
+              </Typography>
+              <Typography color="text.secondary">
+                {isSignup
+                  ? 'Sign up to sync extension captures to this dashboard.'
+                  : 'Log in to review photos, HTML, and source code captured by the extension.'}
+              </Typography>
+            </Box>
 
-        <form className="auth-form stacked" onSubmit={(event) => void handleAuth(event)}>
-          <label>
-            Email
-            <input type="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} required />
-          </label>
-          <label>
-            Password
-            <input type="password" placeholder="Minimum 6 characters" value={password} onChange={(event) => setPassword(event.target.value)} minLength={6} required />
-          </label>
-          <button type="submit">{isSignup ? 'Create account' : 'Login'}</button>
-        </form>
+            <Box component="form" onSubmit={(event) => void handleAuth(event)}>
+              <Stack spacing={2}>
+                <TextField
+                  label="Email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label="Password"
+                  type="password"
+                  placeholder="Minimum 6 characters"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  inputProps={{ minLength: 6 }}
+                  required
+                  fullWidth
+                />
+                <Button type="submit" variant="contained" size="large" sx={{ py: 1.2 }}>
+                  {isSignup ? 'Create account' : 'Login'}
+                </Button>
+              </Stack>
+            </Box>
 
-        {APP_CONFIG.googleClientId && (
-          <div className="stacked">
-            <p className="muted">or continue with Google</p>
-            <div ref={googleButtonRef} />
-          </div>
-        )}
+            {APP_CONFIG.googleClientId && (
+              <Stack spacing={1.5} alignItems="center">
+                <Divider flexItem>or continue with Google</Divider>
+                <Box ref={googleButtonRef} sx={{ minHeight: 40 }} />
+              </Stack>
+            )}
 
-        {status && <p className="status">{status}</p>}
-        <p className="auth-link">
-          {isSignup ? 'Already have an account?' : 'Need an account?'}{' '}
-          <a
-            href={isSignup ? '/login' : '/signup'}
-            onClick={(event) => {
-              event.preventDefault();
-              navigate(isSignup ? '/login' : '/signup');
-            }}
-          >
-            {isSignup ? 'Login' : 'Sign up'}
-          </a>
-        </p>
-      </section>
-    </main>
+            {status && <Alert severity="info">{status}</Alert>}
+
+            <Typography variant="body2" color="text.secondary" textAlign="center">
+              {isSignup ? 'Already have an account?' : 'Need an account?'}{' '}
+              <Link
+                href={isSignup ? '/login' : '/signup'}
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigate(isSignup ? '/login' : '/signup');
+                }}
+                underline="hover"
+              >
+                {isSignup ? 'Login' : 'Sign up'}
+              </Link>
+            </Typography>
+          </Stack>
+        </CardContent>
+      </Card>
+    </Box>
   );
 }
