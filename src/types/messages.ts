@@ -22,6 +22,18 @@ export interface CapturePayload {
   screenshotBase64: string;
   timestamp: string;
   reason: 'command' | 'popup' | 'auto';
+  metadataOnly?: boolean;
+  compressed?: boolean;
+  truncated?: boolean;
+}
+
+export interface TelemetryStats {
+  started: number;
+  success: number;
+  failure: number;
+  totalDurationMs: number;
+  avgDurationMs: number;
+  failureCategories: Record<string, number>;
 }
 
 export interface ExtensionSettings {
@@ -31,5 +43,10 @@ export interface ExtensionSettings {
   authToken: string;
   authEmail: string;
   authUsername: string;
-  popupCaptureShortcut: string;
+  metadataOnlyMode: boolean;
+  maxHtmlSizeBytes: number;
+  lastSuccessAt: string;
+  lastError: string;
+  pendingUploads: number;
+  telemetry: TelemetryStats;
 }
