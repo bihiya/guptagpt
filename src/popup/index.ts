@@ -9,9 +9,6 @@ const statusEl = document.getElementById('status') as HTMLParagraphElement;
 const authGreetingEl = document.getElementById('authGreeting') as HTMLParagraphElement;
 const authEmailEl = document.getElementById('authEmail') as HTMLParagraphElement;
 const logoutBtn = document.getElementById('logoutBtn') as HTMLButtonElement;
-const loginBtn = document.getElementById('loginBtn') as HTMLButtonElement;
-
-const LOGIN_URL = 'https://guptagpt-frontend.vercel.app/login';
 
 function setStatus(message: string): void {
   statusEl.textContent = message;
@@ -68,9 +65,7 @@ async function load(): Promise<void> {
   const name = settings.authUsername || settings.authEmail || 'Guest';
   authGreetingEl.textContent = `Hello, ${name}`;
   authEmailEl.textContent = settings.authEmail || 'Not logged in';
-  const isLoggedIn = Boolean(settings.authToken);
-  logoutBtn.disabled = !isLoggedIn;
-  loginBtn.disabled = isLoggedIn;
+  logoutBtn.disabled = !settings.authToken;
 }
 
 saveBtn.addEventListener('click', async () => {
@@ -118,11 +113,4 @@ logoutBtn.addEventListener('click', async () => {
   } catch (error) {
     setStatus(`Logout failed: ${String(error)}`);
   }
-});
-
-
-loginBtn.addEventListener('click', async () => {
-  const url = `${LOGIN_URL}?extensionId=${encodeURIComponent(chrome.runtime.id)}`;
-  await chrome.tabs.create({ url });
-  window.close();
 });

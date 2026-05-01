@@ -240,22 +240,3 @@ button:hover {
   cursor: not-allowed;
   transform: none;
 }
-
-.auth-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.login-button {
-  padding: 10px 14px;
-  color: #fff;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.24);
-}
-
-.login-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
