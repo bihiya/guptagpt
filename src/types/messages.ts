@@ -29,5 +29,7 @@ export interface ExtensionSettings {
   autoModeEnabled: boolean;
   autoModeIntervalMs: number;
   authToken: string;
+  authEmail: string;
+  authUsername: string;
   popupCaptureShortcut: string;
 }
