@@ -26,3 +26,8 @@ For local development without a MongoDB service, run:
 - `npm run build`
 - Load `dist/` as unpacked extension
 - Set extension backend URL to `http://localhost:3000`
+
+## Auth sync notes
+- For web-to-extension auth sync, the extension `manifest.json` must allow the web origin under `externally_connectable.matches`.
+- If using the hosted frontend, ensure `https://guptagpt-frontend.vercel.app/*` is included.
+- The frontend must be built with the correct `VITE_EXTENSION_ID` for your installed unpacked extension.
