@@ -5,6 +5,8 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   autoModeEnabled: false,
   autoModeIntervalMs: 15000,
   authToken: '',
+  authEmail: '',
+  authUsername: '',
   popupCaptureShortcut: 'Ctrl+Shift+Y'
 };
 

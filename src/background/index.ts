@@ -155,7 +155,11 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
     return;
   }
 
-  setSettings({ authToken: String(message.token ?? '') })
+  setSettings({
+    authToken: String(message.token ?? ''),
+    authEmail: String(message.email ?? ''),
+    authUsername: String(message.username ?? '')
+  })
     .then(() => sendResponse({ ok: true }))
     .catch((error: unknown) => sendResponse({ ok: false, error: String(error) }));
 

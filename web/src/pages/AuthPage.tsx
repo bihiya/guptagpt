@@ -29,7 +29,7 @@ export function AuthPage({ mode }: AuthPageProps) {
   const isSignup = mode === 'signup';
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
 
-  const syncTokenToExtension = async (nextToken: string) => {
+  const syncTokenToExtension = async (nextToken: string, user?: { email?: string; username?: string }) => {
     if (!(window as Window & { chrome?: typeof chrome }).chrome?.runtime || !APP_CONFIG.extensionId) {
       setStatus('Authenticated on web. Set VITE_EXTENSION_ID to sync token to extension.');
       return;
@@ -39,6 +39,8 @@ export function AuthPage({ mode }: AuthPageProps) {
       const response = await chrome.runtime.sendMessage(APP_CONFIG.extensionId, {
         type: 'SYNC_AUTH',
         token: nextToken,
+        email: user?.email ?? '',
+        username: user?.username ?? '',
       });
       setStatus(response?.ok ? 'Authenticated and synced to extension.' : `Sync failed: ${response?.error ?? 'Unknown error'}`);
     } catch (syncError) {
@@ -53,7 +55,7 @@ export function AuthPage({ mode }: AuthPageProps) {
     try {
       const result = isSignup ? await signup(email, password) : await login(email, password);
       saveAuth({ username: result.user.username, email: result.user.email, token: result.token });
-      await syncTokenToExtension(result.token);
+      await syncTokenToExtension(result.token, result.user);
       navigate('/');
     } catch (authError) {
       setStatus(authError instanceof Error ? authError.message : 'Authentication failed');
@@ -86,7 +88,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         setStatus('Signing in with Google...');
         const result = await loginWithGoogle(response.credential);
         saveAuth({ username: result.user.username, email: result.user.email, token: result.token });
-        await syncTokenToExtension(result.token);
+        await syncTokenToExtension(result.token, result.user);
         navigate('/');
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Google authentication failed');
