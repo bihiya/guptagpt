@@ -7,7 +7,20 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   authToken: '',
   authEmail: '',
   authUsername: '',
-  popupCaptureShortcut: 'Ctrl+Shift+Y'
+  metadataOnlyMode: false,
+  maxHtmlSizeBytes: 750000,
+  lastSuccessAt: '',
+  lastError: '',
+  pendingUploads: 0,
+  telemetry: {
+    started: 0,
+    success: 0,
+    failure: 0,
+    totalDurationMs: 0,
+    avgDurationMs: 0,
+    failureCategories: {}
+  }
 };
 
 export const STORAGE_KEY = 'captureSettings';
+export const QUEUE_KEY = 'captureQueue';

@@ -6,6 +6,7 @@
   "permissions": [
     "activeTab",
     "scripting",
+    "sidePanel",
     "storage",
     "tabs"
   ],
@@ -16,9 +17,6 @@
   "background": {
     "service_worker": "background/index.js",
     "type": "module"
-  },
-  "action": {
-    "default_popup": "popup/index.html"
   },
   "commands": {
     "capture-current-tab": {
@@ -47,5 +45,9 @@
       "http://127.0.0.1/*",
       "https://guptagpt-frontend.vercel.app/*"
     ]
+  },
+  "action": {},
+  "side_panel": {
+    "default_path": "popup/index.html"
   }
 }
