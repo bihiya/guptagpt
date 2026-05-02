@@ -36,6 +36,10 @@ function updateIntervalState(): void {
   intervalSelect.disabled = !autoModeCheckbox.checked;
 }
 
+async function persistLastError(message: string): Promise<void> {
+  await setSettings({ lastError: message });
+}
+
 async function refreshDiagnostics(): Promise<void> {
   const settings = await getSettings();
   pendingUploadsEl.textContent = `Pending uploads: ${settings.pendingUploads}`;
@@ -44,6 +48,7 @@ async function refreshDiagnostics(): Promise<void> {
 }
 
 async function runHealthCheck(): Promise<void> {
+  healthStatusEl.textContent = 'Health: checking...';
   const response = await chrome.runtime.sendMessage({ type: 'HEALTH_CHECK' });
   healthStatusEl.textContent = response?.ok ? `Health: OK (${response?.status ?? ''})` : `Health: FAIL (${response?.error ?? response?.status ?? 'unknown'})`;
 }
@@ -54,14 +59,18 @@ async function triggerCapture(): Promise<void> {
     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const activeUrl = activeTab?.url ?? '';
     if (!/^https?:\/\//i.test(activeUrl)) {
-      setStatus('Open a regular website (http/https). chrome:// pages cannot be captured.');
+      const message = 'Open a regular website (http/https). chrome:// pages cannot be captured.';
+      setStatus(message);
+      await persistLastError(message);
       return;
     }
 
     const response = await chrome.runtime.sendMessage({ type: 'CAPTURE_NOW' });
     setStatus(response?.ok ? `Capture queued. Pending: ${response.pendingUploads ?? 0}` : `Capture failed: ${response?.error ?? 'Unknown error'}`);
   } catch (error) {
-    setStatus(`Capture failed: ${String(error)}`);
+    const message = `Capture failed: ${String(error)}`;
+    setStatus(message);
+    await persistLastError(message);
   } finally {
     await refreshDiagnostics();
   }
@@ -112,7 +121,13 @@ autoModeCheckbox.addEventListener('change', updateIntervalState);
 captureBtn.addEventListener('click', () => { void triggerCapture(); });
 retryBtn.addEventListener('click', async () => {
   const response = await chrome.runtime.sendMessage({ type: 'RETRY_PENDING_UPLOADS' });
-  setStatus(response?.ok ? 'Retry started.' : `Retry failed: ${response?.error ?? 'Unknown error'}`);
+  if (response?.ok) {
+    setStatus('Retry started.');
+  } else {
+    const message = `Retry failed: ${response?.error ?? 'Unknown error'}`;
+    setStatus(message);
+    await persistLastError(message);
+  }
   await refreshDiagnostics();
 });
 
