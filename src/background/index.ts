@@ -6,6 +6,52 @@ let autoCaptureTimer: number | null = null;
 let isCapturing = false;
 let queueRetryTimer: number | null = null;
 
+const MAX_SCREENSHOT_BYTES = 3_500_000;
+
+function estimateBase64Bytes(base64: string): number {
+  return Math.floor((base64.length * 3) / 4);
+}
+
+async function optimizeScreenshot(dataUrl: string): Promise<string> {
+  const originalBase64 = dataUrl.split(',')[1] ?? '';
+  if (estimateBase64Bytes(originalBase64) <= MAX_SCREENSHOT_BYTES) return originalBase64;
+
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  const bitmap = await createImageBitmap(blob);
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return originalBase64;
+
+  let scale = 1;
+  let quality = 0.82;
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.width = width;
+    canvas.height = height;
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(bitmap, 0, 0, width, height);
+
+    const jpegBlob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
+    const encoded = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result ?? ''));
+      reader.onerror = () => reject(new Error('Failed to encode screenshot'));
+      reader.readAsDataURL(jpegBlob);
+    });
+
+    const base64 = encoded.split(',')[1] ?? '';
+    if (estimateBase64Bytes(base64) <= MAX_SCREENSHOT_BYTES) return base64;
+
+    quality = Math.max(0.45, quality - 0.1);
+    scale *= 0.85;
+  }
+
+  return originalBase64;
+}
+
 function isCapturableUrl(url: string | undefined): boolean {
   if (!url) return false;
   return /^https?:\/\//i.test(url);
@@ -82,13 +128,14 @@ async function buildPayload(reason: 'command' | 'popup' | 'auto'): Promise<Captu
   const screenshotDataUrl = settings.metadataOnlyMode
     ? 'data:image/png;base64,'
     : await chrome.tabs.captureVisibleTab(tab.windowId as number, { format: 'png' });
+  const screenshotBase64 = settings.metadataOnlyMode ? '' : await optimizeScreenshot(screenshotDataUrl);
 
   const payload: CapturePayload = {
     url: captureData.url,
     title: captureData.title,
     html: settings.metadataOnlyMode ? '' : cappedHtml,
     sourceCode: settings.metadataOnlyMode ? '' : cappedHtml,
-    screenshotBase64: screenshotDataUrl.split(',')[1] ?? '',
+    screenshotBase64,
     timestamp: captureData.timestamp,
     reason,
     metadataOnly: settings.metadataOnlyMode,
