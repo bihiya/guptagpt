@@ -8,6 +8,7 @@ const captureSchema = new Schema(
     html: { type: String, required: true },
     sourceCode: { type: String, required: true },
     screenshotBase64: { type: String, required: true },
+    pdfBase64: { type: String, default: '' },
     timestamp: { type: Date, required: true },
     reason: { type: String, enum: ['command', 'popup', 'auto'], required: true }
   },
