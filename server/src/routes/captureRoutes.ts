@@ -4,10 +4,6 @@ import { createCapture, listCaptures } from '../services/captureService.js';
 import type { CaptureRequestBody } from '../types.js';
 
 const router = Router();
-const MAX_HTML_SIZE = 2_000_000;
-const MAX_SOURCE_SIZE = 2_000_000;
-const MAX_IMAGE_SIZE = 10_000_000;
-const MAX_PDF_SIZE = 20_000_000;
 const REASONS = new Set(['command', 'popup', 'auto']);
 
 function isValidPayload(body: Partial<CaptureRequestBody>): body is CaptureRequestBody {
@@ -26,14 +22,6 @@ function isValidPayload(body: Partial<CaptureRequestBody>): body is CaptureReque
   try {
     new URL(body.url);
   } catch {
-    return false;
-  }
-
-  if (
-    body.html.length > MAX_HTML_SIZE
-    || body.sourceCode.length > MAX_SOURCE_SIZE
-    || body.screenshotBase64.length > MAX_IMAGE_SIZE
-  ) {
     return false;
   }
 
