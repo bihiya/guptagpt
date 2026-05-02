@@ -28,7 +28,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import type { CaptureItem } from '../types';
 
-type CaptureTab = 'photo' | 'html' | 'source';
+type CaptureTab = 'photo' | 'pdf' | 'html' | 'source';
 type SortBy = 'newest' | 'oldest' | 'title';
 type FilterTag = 'all' | 'bug' | 'design' | 'qa';
 
@@ -56,13 +56,31 @@ function downloadFile(name: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
+function downloadBase64File(name: string, base64Content: string, type: string) {
+  const bytes = Uint8Array.from(atob(base64Content), (char) => char.charCodeAt(0));
+  const blob = new Blob([bytes], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function CaptureTabs({ item, compareItem }: { item: CaptureItem; compareItem?: CaptureItem }) {
   const [activeTab, setActiveTab] = useState<CaptureTab>('photo');
   const [copied, setCopied] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const pdfBase64 = item.pdfBase64 ?? '';
 
   const copyActiveContent = async () => {
-    const content = activeTab === 'html' ? item.html : activeTab === 'source' ? item.sourceCode : item.url;
+    const content = activeTab === 'html'
+      ? item.html
+      : activeTab === 'source'
+        ? item.sourceCode
+        : activeTab === 'pdf'
+          ? (item.pdfBase64 || 'No PDF in this capture')
+          : item.url;
     await navigator.clipboard.writeText(getPreviewText(content));
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
@@ -77,6 +95,7 @@ function CaptureTabs({ item, compareItem }: { item: CaptureItem; compareItem?: C
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
         <Tabs value={activeTab} onChange={(_e, v) => setActiveTab(v)}>
           <Tab value="photo" label="Photo" />
+          <Tab value="pdf" label="PDF" />
           <Tab value="html" label="HTML Viewer" />
           <Tab value="source" label="Source" />
         </Tabs>
@@ -101,13 +120,33 @@ function CaptureTabs({ item, compareItem }: { item: CaptureItem; compareItem?: C
             </Stack>
           </Stack>
         )}
-        {activeTab !== 'photo' && compareItem && (
+        {activeTab === 'pdf' && (
+          pdfBase64
+            ? <Stack direction="row" spacing={1}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={() => window.open(`data:application/pdf;base64,${pdfBase64}`, '_blank', 'noopener,noreferrer')}
+                >
+                  Open PDF
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => downloadBase64File(`${item.title || 'capture'}.pdf`, pdfBase64, 'application/pdf')}
+                >
+                  Download PDF
+                </Button>
+              </Stack>
+            : <Typography variant="body2">No PDF was captured for this item.</Typography>
+        )}
+        {activeTab !== 'photo' && activeTab !== 'pdf' && compareItem && (
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
             <Box component="pre" sx={{ flex: 1, maxHeight: 320, overflow: 'auto' }}>{getPreviewText(currentText)}</Box>
             <Box component="pre" sx={{ flex: 1, maxHeight: 320, overflow: 'auto', borderLeft: '1px solid #ddd', pl: 1 }}>{getPreviewText(compareText)}</Box>
           </Stack>
         )}
-        {activeTab !== 'photo' && !compareItem && <Box component="pre" sx={{ maxHeight: 320, overflow: 'auto' }}>{getPreviewText(currentText)}</Box>}
+        {activeTab !== 'photo' && activeTab !== 'pdf' && !compareItem && <Box component="pre" sx={{ maxHeight: 320, overflow: 'auto' }}>{getPreviewText(currentText)}</Box>}
       </Box>
     </Box>
       <Dialog open={imageDialogOpen} onClose={() => setImageDialogOpen(false)} maxWidth="xl" fullWidth>

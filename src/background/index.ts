@@ -200,27 +200,32 @@ async function postPayload(payload: CapturePayload): Promise<void> {
     }
   });
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(settings.authToken ? { Authorization: `Bearer ${settings.authToken}` } : {})
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (response.status === 413 && payload.screenshotBase64) {
-    const retryPayload = { ...payload, screenshotBase64: '' };
-    const retryResponse = await fetch(endpoint, {
+  const sendPayload = async (nextPayload: CapturePayload): Promise<Response> => fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(settings.authToken ? { Authorization: `Bearer ${settings.authToken}` } : {})
       },
-      body: JSON.stringify(retryPayload)
+      body: JSON.stringify(nextPayload)
     });
-    if (!retryResponse.ok) throw new Error(`Capture API failed with status ${retryResponse.status}`);
-  } else if (!response.ok) {
+
+  let response = await sendPayload(payload);
+
+  if (response.status === 413) {
+    const retryCandidates: CapturePayload[] = [];
+    if (payload.pdfBase64) retryCandidates.push({ ...payload, pdfBase64: '' });
+    if (payload.screenshotBase64) retryCandidates.push({ ...payload, screenshotBase64: '' });
+    if (payload.pdfBase64 || payload.screenshotBase64) retryCandidates.push({ ...payload, pdfBase64: '', screenshotBase64: '' });
+    if (payload.html || payload.sourceCode) retryCandidates.push({ ...payload, html: '', sourceCode: '', pdfBase64: '', screenshotBase64: '' });
+
+    for (const retryPayload of retryCandidates) {
+      response = await sendPayload(retryPayload);
+      if (response.ok) break;
+      if (response.status !== 413) break;
+    }
+  }
+
+  if (!response.ok) {
     throw new Error(`Capture API failed with status ${response.status}`);
   }
 
