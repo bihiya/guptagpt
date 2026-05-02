@@ -54,7 +54,7 @@ async function optimizeScreenshot(dataUrl: string): Promise<string> {
 
 function isCapturableUrl(url: string | undefined): boolean {
   if (!url) return false;
-  return /^https?:\/\//i.test(url);
+  return /^https?:\/\//i.test(url) && !url.startsWith('chrome-error://');
 }
 
 function categorizeError(error: unknown): string {
@@ -162,7 +162,6 @@ async function postPayload(payload: CapturePayload): Promise<void> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Content-Encoding': 'gzip',
       ...(settings.authToken ? { Authorization: `Bearer ${settings.authToken}` } : {})
     },
     body: JSON.stringify(payload)
@@ -275,7 +274,7 @@ async function syncAutoMode(): Promise<void> {
 async function healthCheck(): Promise<{ ok: boolean; status?: number; error?: string }> {
   try {
     const settings = await getSettings();
-    const endpoint = new URL('/api/health', settings.backendBaseUrl).toString();
+    const endpoint = new URL('/health', settings.backendBaseUrl).toString();
     const response = await fetch(endpoint, { method: 'GET' });
     return { ok: response.ok, status: response.status };
   } catch (error) {

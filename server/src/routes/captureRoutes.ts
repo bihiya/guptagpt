@@ -10,7 +10,7 @@ const MAX_IMAGE_SIZE = 10_000_000;
 const REASONS = new Set(['command', 'popup', 'auto']);
 
 function isValidPayload(body: Partial<CaptureRequestBody>): body is CaptureRequestBody {
-  if (!body.url || !body.title || !body.html || !body.sourceCode || !body.screenshotBase64 || !body.timestamp || !body.reason) {
+  if (!body.url || !body.title || typeof body.html !== 'string' || typeof body.sourceCode !== 'string' || typeof body.screenshotBase64 !== 'string' || !body.timestamp || !body.reason) {
     return false;
   }
 
