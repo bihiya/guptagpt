@@ -71,6 +71,7 @@ function CaptureTabs({ item, compareItem }: { item: CaptureItem; compareItem?: C
   const [activeTab, setActiveTab] = useState<CaptureTab>('photo');
   const [copied, setCopied] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const pdfBase64 = item.pdfBase64 ?? '';
 
   const copyActiveContent = async () => {
     const content = activeTab === 'html'
@@ -120,19 +121,19 @@ function CaptureTabs({ item, compareItem }: { item: CaptureItem; compareItem?: C
           </Stack>
         )}
         {activeTab === 'pdf' && (
-          item.pdfBase64
+          pdfBase64
             ? <Stack direction="row" spacing={1}>
                 <Button
                   size="small"
                   variant="contained"
-                  onClick={() => window.open(`data:application/pdf;base64,${item.pdfBase64}`, '_blank', 'noopener,noreferrer')}
+                  onClick={() => window.open(`data:application/pdf;base64,${pdfBase64}`, '_blank', 'noopener,noreferrer')}
                 >
                   Open PDF
                 </Button>
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={() => downloadBase64File(`${item.title || 'capture'}.pdf`, item.pdfBase64, 'application/pdf')}
+                  onClick={() => downloadBase64File(`${item.title || 'capture'}.pdf`, pdfBase64, 'application/pdf')}
                 >
                   Download PDF
                 </Button>
