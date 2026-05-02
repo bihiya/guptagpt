@@ -28,6 +28,17 @@ function isValidPayload(body: Partial<CaptureRequestBody>): body is CaptureReque
   return !Number.isNaN(Date.parse(body.timestamp));
 }
 
+function sanitizePayload(body: CaptureRequestBody): CaptureRequestBody {
+  if ((body.pdfBase64?.length ?? 0) <= MAX_PDF_SIZE) {
+    return body;
+  }
+
+  return {
+    ...body,
+    pdfBase64: ''
+  };
+}
+
 router.post('/capture', requireAuth, async (req, res, next) => {
   try {
     const body = req.body as Partial<CaptureRequestBody>;
@@ -36,7 +47,7 @@ router.post('/capture', requireAuth, async (req, res, next) => {
       return;
     }
 
-    const capture = await createCapture(body, req.authUser!.id);
+    const capture = await createCapture(sanitizePayload(body), req.authUser!.id);
     res.status(201).json({ id: capture.id });
   } catch (error) {
     next(error);
