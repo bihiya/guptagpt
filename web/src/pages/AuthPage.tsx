@@ -30,19 +30,31 @@ export function AuthPage({ mode }: AuthPageProps) {
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
 
   const syncTokenToExtension = async (nextToken: string, user?: { email?: string; username?: string }) => {
-    if (!(window as Window & { chrome?: typeof chrome }).chrome?.runtime || !APP_CONFIG.extensionId) {
-      setStatus('Authenticated on web. Set VITE_EXTENSION_ID to sync token to extension.');
+    if (!(window as Window & { chrome?: typeof chrome }).chrome?.runtime || APP_CONFIG.extensionIds.length === 0) {
+      setStatus('Authenticated on web. Set VITE_EXTENSION_ID (comma-separated for multiple IDs) to sync token to extension.');
       return;
     }
 
     try {
-      const response = await chrome.runtime.sendMessage(APP_CONFIG.extensionId, {
-        type: 'SYNC_AUTH',
-        token: nextToken,
-        email: user?.email ?? '',
-        username: user?.username ?? '',
-      });
-      setStatus(response?.ok ? 'Authenticated and synced to extension.' : `Sync failed: ${response?.error ?? 'Unknown error'}`);
+      for (const extensionId of APP_CONFIG.extensionIds) {
+        try {
+          const response = await chrome.runtime.sendMessage(extensionId, {
+            type: 'SYNC_AUTH',
+            token: nextToken,
+            email: user?.email ?? '',
+            username: user?.username ?? '',
+          });
+
+          if (response?.ok) {
+            setStatus('Authenticated and synced to extension.');
+            return;
+          }
+        } catch {
+          // Try the next configured extension id.
+        }
+      }
+
+      setStatus('Sync failed for all configured extension IDs.');
     } catch (syncError) {
       setStatus(`Sync failed: ${String(syncError)}`);
     }
