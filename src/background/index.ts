@@ -7,6 +7,8 @@ let isCapturing = false;
 let queueRetryTimer: number | null = null;
 
 const MAX_SCREENSHOT_BYTES = 3_500_000;
+const MIN_SCREENSHOT_CAPTURE_INTERVAL_MS = 1200;
+let lastScreenshotCaptureAt = 0;
 
 function estimateBase64Bytes(base64: string): number {
   return Math.floor((base64.length * 3) / 4);
@@ -63,6 +65,30 @@ function categorizeError(error: unknown): string {
   if (message.includes('status 5')) return 'server';
   if (message.includes('network') || message.includes('fetch')) return 'network';
   return 'other';
+}
+
+function isCapturePermissionError(error: unknown): boolean {
+  const message = String(error).toLowerCase();
+  return message.includes("'<all_urls>'") || message.includes('activetab') || message.includes('permission');
+}
+
+function isCaptureQuotaError(error: unknown): boolean {
+  return String(error).toLowerCase().includes('max_capture_visible_tab_calls_per_second');
+}
+
+function ensureScreenshotThrottle(): Promise<void> {
+  const now = Date.now();
+  const waitMs = Math.max(0, MIN_SCREENSHOT_CAPTURE_INTERVAL_MS - (now - lastScreenshotCaptureAt));
+  if (!waitMs) {
+    lastScreenshotCaptureAt = now;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    self.setTimeout(() => {
+      lastScreenshotCaptureAt = Date.now();
+      resolve();
+    }, waitMs);
+  });
 }
 
 type QueueItem = {
@@ -125,10 +151,20 @@ async function buildPayload(reason: 'command' | 'popup' | 'auto'): Promise<Captu
   const fullHtml = captureData.html ?? '';
   const cappedHtml = fullHtml.slice(0, settings.maxHtmlSizeBytes);
   const truncated = cappedHtml.length < fullHtml.length;
-  const screenshotDataUrl = settings.metadataOnlyMode
-    ? 'data:image/png;base64,'
-    : await chrome.tabs.captureVisibleTab(tab.windowId as number, { format: 'png' });
-  const screenshotBase64 = settings.metadataOnlyMode ? '' : await optimizeScreenshot(screenshotDataUrl);
+  let screenshotBase64 = '';
+  if (!settings.metadataOnlyMode) {
+    try {
+      await ensureScreenshotThrottle();
+      const screenshotDataUrl = await chrome.tabs.captureVisibleTab(tab.windowId as number, { format: 'png' });
+      screenshotBase64 = await optimizeScreenshot(screenshotDataUrl);
+    } catch (error) {
+      if (isCapturePermissionError(error) || isCaptureQuotaError(error)) {
+        console.warn('[capture] screenshot unavailable; continuing without screenshot', error);
+      } else {
+        throw error;
+      }
+    }
+  }
 
   const payload: CapturePayload = {
     url: captureData.url,
@@ -167,7 +203,20 @@ async function postPayload(payload: CapturePayload): Promise<void> {
     body: JSON.stringify(payload)
   });
 
-  if (!response.ok) throw new Error(`Capture API failed with status ${response.status}`);
+  if (response.status === 413 && payload.screenshotBase64) {
+    const retryPayload = { ...payload, screenshotBase64: '' };
+    const retryResponse = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(settings.authToken ? { Authorization: `Bearer ${settings.authToken}` } : {})
+      },
+      body: JSON.stringify(retryPayload)
+    });
+    if (!retryResponse.ok) throw new Error(`Capture API failed with status ${retryResponse.status}`);
+  } else if (!response.ok) {
+    throw new Error(`Capture API failed with status ${response.status}`);
+  }
 
   const fresh = await getSettings();
   const duration = Date.now() - startedAt;
