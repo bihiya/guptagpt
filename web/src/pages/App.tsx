@@ -6,30 +6,19 @@ import {
   Button,
   Chip,
   CssBaseline,
-  Divider,
-  Drawer,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
   Paper,
   Stack,
   TextField,
   Toolbar,
-  Typography
+  Typography,
+  Snackbar
 } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
-import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
-import DoneAllOutlinedIcon from '@mui/icons-material/DoneAllOutlined';
-import SellOutlinedIcon from '@mui/icons-material/SellOutlined';
-import CompareArrowsOutlinedIcon from '@mui/icons-material/CompareArrowsOutlined';
-import IconButton from '@mui/material/IconButton';
 import { AUTH_KEY, getSavedAuth } from '../auth';
+import { APP_CONFIG } from '../config';
 import { CaptureList } from '../components/CaptureList';
+import { AppLoader } from '../components/AppLoader';
 import { navigate } from '../router';
 import { selectFilteredCaptures, useStore } from '../store';
-
-const drawerWidth = 280;
 
 export function App() {
   const { state, dispatch, loadCaptures } = useStore();
@@ -37,18 +26,46 @@ export function App() {
   const filteredItems = selectFilteredCaptures(state);
   const savedAuth = getSavedAuth();
   const isLoggedIn = Boolean(savedAuth?.token);
-  const [open, setOpen] = useState(true);
+
+  const [syncToast, setSyncToast] = useState('');
+
+  const syncToExtension = async (mode: 'login' | 'logout') => {
+    const extensionIds = APP_CONFIG.extensionIds;
+    if (!extensionIds.length) {
+      setSyncToast('No extension ID configured. Set VITE_EXTENSION_ID to enable sync.');
+      return;
+    }
+
+    if (!(window as Window & { chrome?: typeof chrome }).chrome?.runtime) {
+      setSyncToast('Chrome runtime unavailable. Open this dashboard in Chrome to sync.');
+      return;
+    }
+
+    try {
+      for (const extensionId of extensionIds) {
+        const payload = mode === 'login'
+          ? { type: 'SYNC_AUTH', token: savedAuth?.token ?? '', email: savedAuth?.email ?? '', username: savedAuth?.username ?? '' }
+          : { type: 'SYNC_AUTH', token: '', email: '', username: '' };
+
+        try {
+          const response = await chrome.runtime.sendMessage(extensionId, payload);
+          if (response?.ok) {
+            setSyncToast(mode === 'login' ? 'Extension synced with dashboard login.' : 'Extension synced with dashboard logout.');
+            return;
+          }
+        } catch {
+          // try next extension id
+        }
+      }
+      setSyncToast('Sync failed for configured extension IDs.');
+    } catch (err) {
+      setSyncToast(`Sync error: ${String(err)}`);
+    }
+  };
 
   useEffect(() => {
     if (savedAuth?.token) void loadCaptures(savedAuth.token);
   }, []);
-
-  const sidebarItems = [
-    { label: 'Pinned favorites', icon: <PushPinOutlinedIcon fontSize="small" /> },
-    { label: 'Bulk actions', icon: <DoneAllOutlinedIcon fontSize="small" /> },
-    { label: 'Tags & filters', icon: <SellOutlinedIcon fontSize="small" /> },
-    { label: 'Diff viewer', icon: <CompareArrowsOutlinedIcon fontSize="small" /> }
-  ];
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f5f7fb' }}>
@@ -64,9 +81,6 @@ export function App() {
         }}
       >
         <Toolbar sx={{ py: 0.5 }}>
-          <IconButton color="inherit" onClick={() => setOpen((v) => !v)} sx={{ mr: 1 }}>
-            <MenuIcon />
-          </IconButton>
           <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', mr: 1.5 }}>C</Avatar>
           <Box sx={{ flexGrow: 1 }}>
             <Typography variant="h6" fontWeight={700} lineHeight={1.1}>
@@ -80,42 +94,14 @@ export function App() {
             <Chip size="small" label={isLoggedIn ? 'Authenticated' : 'Guest'} color={isLoggedIn ? 'success' : 'default'} />
             <Button color="inherit" onClick={() => navigate('/settings')}>Settings</Button>
             {isLoggedIn && <Button color="inherit" onClick={() => void loadCaptures(savedAuth?.token ?? '')}>Refresh</Button>}
-            {isLoggedIn ? <Button color="inherit" onClick={() => { localStorage.removeItem(AUTH_KEY); navigate('/login'); }}>Logout</Button> : <Button color="inherit" onClick={() => navigate('/login')}>Login</Button>}
+            {isLoggedIn && <Button color="inherit" onClick={() => void syncToExtension('login')}>Sync Login → Ext</Button>}
+            <Button color="inherit" onClick={() => void syncToExtension('logout')}>Sync Logout → Ext</Button>
+            {isLoggedIn ? <Button color="inherit" onClick={() => { localStorage.removeItem(AUTH_KEY); void syncToExtension('logout'); navigate('/login'); }}>Logout</Button> : <Button color="inherit" onClick={() => navigate('/login')}>Login</Button>}
           </Stack>
         </Toolbar>
       </AppBar>
 
-      <Drawer
-        variant="persistent"
-        open={open}
-        sx={{
-          width: drawerWidth,
-          '& .MuiDrawer-paper': {
-            width: drawerWidth,
-            mt: 8,
-            p: 2,
-            border: 'none',
-            bgcolor: 'transparent'
-          }
-        }}
-      >
-        <Paper elevation={0} sx={{ borderRadius: 3, p: 1.5, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
-          <Typography variant="subtitle2" color="text.secondary" sx={{ px: 1, pb: 1 }}>
-            Workspace
-          </Typography>
-          <List sx={{ p: 0 }}>
-            {sidebarItems.map((item) => (
-              <ListItemButton key={item.label} sx={{ borderRadius: 2, mb: 0.5 }}>
-                <ListItemIcon sx={{ minWidth: 34 }}>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.label} />
-              </ListItemButton>
-            ))}
-          </List>
-        </Paper>
-        <Divider sx={{ my: 2 }} />
-      </Drawer>
-
-      <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 3 }, mt: 8, maxWidth: 1180, mx: 'auto', width: '100%' }}>
         <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', p: 2, mb: 2 }}>
           <TextField
             fullWidth
@@ -124,10 +110,11 @@ export function App() {
             onChange={(e) => dispatch({ type: 'query/set', payload: e.target.value })}
           />
         </Paper>
-        {loading && <Typography>Loading captures...</Typography>}
+        {loading && <AppLoader message="Loading captures..." />}
         {error && <Typography color="error">{error}</Typography>}
         {!loading && !error && <CaptureList items={filteredItems} />}
       </Box>
+      <Snackbar open={Boolean(syncToast)} autoHideDuration={2600} onClose={() => setSyncToast('')} message={syncToast} />
     </Box>
   );
 }

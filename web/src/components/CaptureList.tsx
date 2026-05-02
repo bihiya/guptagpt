@@ -20,6 +20,7 @@ import {
   Tabs,
   TextField,
   Typography,
+  Snackbar,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import PushPinIcon from '@mui/icons-material/PushPin';
@@ -27,6 +28,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import type { CaptureItem } from '../types';
+import { CaptureTimestamp } from './CaptureTimestamp';
 
 type CaptureTab = 'photo' | 'pdf' | 'html' | 'source';
 type SortBy = 'newest' | 'oldest' | 'title';
@@ -67,6 +69,23 @@ function downloadBase64File(name: string, base64Content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
+
+
+function fileSafeName(value: string) {
+  return value.trim().replace(/[^a-z0-9-_]+/gi, '_').replace(/^_+|_+$/g, '') || 'capture';
+}
+
+function CaptureQuickActions({ onCopy, onClear, onExport }: { onCopy: () => void; onClear: () => void; onExport: (type: 'json' | 'html' | 'md') => void }) {
+  return (
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+      <Button onClick={onCopy} startIcon={<ContentCopyIcon />} variant="contained">Copy</Button>
+      <Button onClick={onClear} startIcon={<DeleteIcon />} variant="outlined">Clear select</Button>
+      <Button onClick={() => onExport('json')} startIcon={<DownloadIcon />} variant="outlined">Export JSON</Button>
+      <Button onClick={() => onExport('html')} startIcon={<DownloadIcon />} variant="outlined">Export HTML</Button>
+      <Button onClick={() => onExport('md')} startIcon={<DownloadIcon />} variant="outlined">Export MD</Button>
+    </Stack>
+  );
+}
 function CaptureTabs({ item, compareItem }: { item: CaptureItem; compareItem?: CaptureItem }) {
   const [activeTab, setActiveTab] = useState<CaptureTab>('photo');
   const [copied, setCopied] = useState(false);
@@ -113,7 +132,15 @@ function CaptureTabs({ item, compareItem }: { item: CaptureItem; compareItem?: C
               alt={item.title}
               sx={{ width: '100%', maxHeight: 420, objectFit: 'contain' }}
             />
-            <Stack direction="row" justifyContent="flex-end">
+            <Stack direction="row" justifyContent="flex-end" spacing={1}>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                onClick={() => downloadBase64File(`${fileSafeName(item.title)}.png`, item.screenshotBase64, 'image/png')}
+              >
+                Download Photo
+              </Button>
               <Button size="small" startIcon={<ZoomInIcon />} onClick={() => setImageDialogOpen(true)}>
                 Full view (zoom)
               </Button>
@@ -175,6 +202,7 @@ export function CaptureList({ items }: { items: CaptureItem[] }) {
   const [query, setQuery] = useState('');
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [toast, setToast] = useState('');
 
   useEffect(() => {
     const saved = localStorage.getItem(VIEW_KEY);
@@ -222,13 +250,15 @@ export function CaptureList({ items }: { items: CaptureItem[] }) {
   const bulkCopy = async () => {
     const text = sortedItems.filter((x) => selectedIds.includes(x._id)).map((x) => `${x.title}\n${x.url}`).join('\n\n');
     await navigator.clipboard.writeText(text);
+    setToast('Copied selected captures');
   };
-  const bulkDelete = () => setSelectedIds([]);
+  const bulkDelete = () => { setSelectedIds([]); setToast('Selection cleared'); };
   const bulkExport = (type: 'json' | 'html' | 'md') => {
     const selected = sortedItems.filter((x) => selectedIds.includes(x._id));
     if (type === 'json') downloadFile('captures.json', JSON.stringify(selected, null, 2), 'application/json');
     if (type === 'html') downloadFile('captures.html', selected.map((x) => x.html).join('\n<!-- split -->\n'), 'text/html');
     if (type === 'md') downloadFile('captures.md', selected.map((x) => `## ${x.title}\n${x.url}`).join('\n\n'), 'text/markdown');
+    setToast(`Exported ${selected.length} capture(s) as ${type.toUpperCase()}`);
   };
 
   if (!items.length) return <Typography>No captures yet.</Typography>;
@@ -247,21 +277,16 @@ export function CaptureList({ items }: { items: CaptureItem[] }) {
       <Stack direction="row" spacing={1} flexWrap="wrap">
         {(['all', 'bug', 'design', 'qa'] as FilterTag[]).map((tag) => <Chip key={tag} label={tag} color={tag === tagFilter ? 'primary' : 'default'} onClick={() => { setTagFilter(tag); persistView({ sortBy, tag, query }); }} />)}
       </Stack>
-      <Stack direction="row" spacing={1}>
-        <Button onClick={() => void bulkCopy()} startIcon={<ContentCopyIcon />}>Copy</Button>
-        <Button onClick={() => bulkDelete()} startIcon={<DeleteIcon />}>Clear select</Button>
-        <Button onClick={() => bulkExport('json')} startIcon={<DownloadIcon />}>Export JSON</Button>
-        <Button onClick={() => bulkExport('html')} startIcon={<DownloadIcon />}>Export HTML</Button>
-        <Button onClick={() => bulkExport('md')} startIcon={<DownloadIcon />}>Export MD</Button>
-      </Stack>
+      <CaptureQuickActions onCopy={() => void bulkCopy()} onClear={bulkDelete} onExport={bulkExport} />
       {sortedItems.map((item, idx) => (
-        <Card key={item._id} variant={idx === activeIndex ? 'elevation' : 'outlined'}>
+        <Card key={item._id} variant={idx === activeIndex ? 'elevation' : 'outlined'} sx={{ borderRadius: 3, boxShadow: idx === activeIndex ? 6 : 1 }}>
           <CardContent>
-            <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Checkbox checked={selectedIds.includes(item._id)} onChange={() => setSelectedIds((prev) => prev.includes(item._id) ? prev.filter((x) => x !== item._id) : [...prev, item._id])} />
                 <Typography variant="h6">{item.title}</Typography>
                 <Chip size="small" label={tags[item._id] ?? 'untagged'} />
+                <CaptureTimestamp createdAt={item.createdAt} />
               </Stack>
               <IconButton onClick={() => togglePin(item._id)} color={pinnedIds.includes(item._id) ? 'primary' : 'default'}><PushPinIcon /></IconButton>
             </Stack>
@@ -280,6 +305,7 @@ export function CaptureList({ items }: { items: CaptureItem[] }) {
           <Typography>j/k : move selection</Typography>
         </DialogContent>
       </Dialog>
+      <Snackbar open={Boolean(toast)} autoHideDuration={2200} onClose={() => setToast('')} message={toast} />
     </Stack>
   );
 }
