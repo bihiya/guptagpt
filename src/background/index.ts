@@ -5,8 +5,10 @@ import { QUEUE_KEY } from '../utils/constants.js';
 let autoCaptureTimer: number | null = null;
 let isCapturing = false;
 let queueRetryTimer: number | null = null;
+let lastScreenshotCaptureAt = 0;
 
 const MAX_SCREENSHOT_BYTES = 1_500_000;
+const MIN_SCREENSHOT_CAPTURE_INTERVAL_MS = 1200;
 
 function estimateBase64Bytes(base64: string): number {
   return Math.floor((base64.length * 3) / 4);
@@ -150,7 +152,7 @@ async function buildPayload(reason: 'command' | 'popup' | 'auto'): Promise<Captu
   const cappedHtml = fullHtml.slice(0, settings.maxHtmlSizeBytes);
   const truncated = cappedHtml.length < fullHtml.length;
   let screenshotBase64 = '';
-  if (!settings.metadataOnlyMode) {
+  if (!settings.metadataOnlyMode && settings.includeImage) {
     try {
       await ensureScreenshotThrottle();
       const screenshotDataUrl = await chrome.tabs.captureVisibleTab(tab.windowId as number, { format: 'png' });
@@ -164,12 +166,18 @@ async function buildPayload(reason: 'command' | 'popup' | 'auto'): Promise<Captu
     }
   }
 
+  let pdfBase64 = '';
+  if (!settings.metadataOnlyMode && settings.includePdf) {
+    pdfBase64 = await exportActiveTabPdfBase64(tabId);
+  }
+
   const payload: CapturePayload = {
     url: captureData.url,
     title: captureData.title,
-    html: settings.metadataOnlyMode ? '' : cappedHtml,
-    sourceCode: '',
+    html: settings.metadataOnlyMode || !settings.includeHtml ? '' : cappedHtml,
+    sourceCode: settings.metadataOnlyMode || !settings.includeSourceCode ? '' : cappedHtml,
     screenshotBase64,
+    pdfBase64,
     timestamp: captureData.timestamp,
     reason,
     metadataOnly: settings.metadataOnlyMode,
@@ -344,6 +352,42 @@ async function healthCheck(): Promise<{ ok: boolean; status?: number; error?: st
   }
 }
 
+async function printActiveTabToPdf(): Promise<void> {
+  const tab = await getActiveTab();
+  const tabId = tab.id as number;
+  const debuggee = { tabId };
+
+  await chrome.debugger.attach(debuggee, '1.3');
+  try {
+    const pdfBase64 = await exportActiveTabPdfBase64(tabId, debuggee);
+    const filenameSafeTitle = (tab.title || 'tab').replace(/[^a-z0-9-_]+/gi, '_').slice(0, 80);
+    await chrome.downloads.download({
+      url: `data:application/pdf;base64,${pdfBase64}`,
+      filename: `${filenameSafeTitle || 'tab'}-${Date.now()}.pdf`,
+      saveAs: false
+    });
+  } finally {
+    await chrome.debugger.detach(debuggee).catch(() => undefined);
+  }
+}
+
+async function exportActiveTabPdfBase64(tabId: number, existingDebuggee?: { tabId: number }): Promise<string> {
+  const debuggee = existingDebuggee ?? { tabId };
+  const shouldDetach = !existingDebuggee;
+  if (shouldDetach) await chrome.debugger.attach(debuggee, '1.3');
+  try {
+    await chrome.debugger.sendCommand(debuggee, 'Page.enable');
+    const result = (await chrome.debugger.sendCommand(debuggee, 'Page.printToPDF', {
+      printBackground: true,
+      preferCSSPageSize: true
+    })) as { data?: string };
+    if (!result?.data) throw new Error('PDF generation failed.');
+    return result.data;
+  } finally {
+    if (shouldDetach) await chrome.debugger.detach(debuggee).catch(() => undefined);
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error: unknown) => console.error(error));
   syncAutoMode().catch((error: unknown) => console.error(error));
@@ -362,6 +406,7 @@ chrome.storage.onChanged.addListener((_changes, areaName) => {
 
 chrome.commands.onCommand.addListener((command) => {
   if (command === 'capture-current-tab') captureAndQueue('command').catch((error: unknown) => console.error(error));
+  if (command === 'print-current-tab-pdf') printActiveTabToPdf().catch((error: unknown) => console.error(error));
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -411,6 +456,10 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
       autoModeIntervalMs: Number(message.autoModeIntervalMs) || 15000,
       metadataOnlyMode: Boolean(message.metadataOnlyMode),
       maxHtmlSizeBytes: Number(message.maxHtmlSizeBytes) || 750000,
+      includeImage: message.includeImage !== false,
+      includePdf: Boolean(message.includePdf),
+      includeHtml: message.includeHtml !== false,
+      includeSourceCode: message.includeSourceCode !== false,
       backendBaseUrl: String(message.backendBaseUrl || '')
     })
       .then(() => sendResponse({ ok: true }))

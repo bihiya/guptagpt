@@ -8,7 +8,9 @@
     "scripting",
     "sidePanel",
     "storage",
-    "tabs"
+    "tabs",
+    "downloads",
+    "debugger"
   ],
   "host_permissions": [
     "http://*/*",
@@ -25,6 +27,13 @@
         "mac": "Command+Shift+Y"
       },
       "description": "Capture current tab and send to backend"
+    },
+    "print-current-tab-pdf": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+P",
+        "mac": "Command+Shift+P"
+      },
+      "description": "Print current tab to PDF silently"
     }
   },
   "content_scripts": [

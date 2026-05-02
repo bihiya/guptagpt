@@ -4,6 +4,10 @@ const intervalSelect = document.getElementById('intervalMinutes') as HTMLSelectE
 const autoModeCheckbox = document.getElementById('autoModeEnabled') as HTMLInputElement;
 const metadataOnlyModeCheckbox = document.getElementById('metadataOnlyMode') as HTMLInputElement;
 const maxHtmlSizeBytesInput = document.getElementById('maxHtmlSizeBytes') as HTMLInputElement;
+const includeImageCheckbox = document.getElementById('includeImage') as HTMLInputElement;
+const includePdfCheckbox = document.getElementById('includePdf') as HTMLInputElement;
+const includeHtmlCheckbox = document.getElementById('includeHtml') as HTMLInputElement;
+const includeSourceCodeCheckbox = document.getElementById('includeSourceCode') as HTMLInputElement;
 const saveBtn = document.getElementById('saveBtn') as HTMLButtonElement;
 const captureBtn = document.getElementById('captureBtn') as HTMLButtonElement;
 const retryBtn = document.getElementById('retryBtn') as HTMLButtonElement;
@@ -70,6 +74,10 @@ async function load(): Promise<void> {
   updateIntervalState();
   metadataOnlyModeCheckbox.checked = settings.metadataOnlyMode;
   maxHtmlSizeBytesInput.value = String(settings.maxHtmlSizeBytes);
+  includeImageCheckbox.checked = settings.includeImage;
+  includePdfCheckbox.checked = settings.includePdf;
+  includeHtmlCheckbox.checked = settings.includeHtml;
+  includeSourceCodeCheckbox.checked = settings.includeSourceCode;
   const name = settings.authUsername || settings.authEmail || 'Guest';
   authGreetingEl.textContent = `Hello, ${name}`;
   authEmailEl.textContent = settings.authEmail || 'Not logged in';
@@ -86,7 +94,11 @@ saveBtn.addEventListener('click', async () => {
       autoModeEnabled: autoModeCheckbox.checked,
       autoModeIntervalMs: Number.isFinite(minutes) ? minutes * 60000 : 15 * 60000,
       metadataOnlyMode: metadataOnlyModeCheckbox.checked,
-      maxHtmlSizeBytes: Number.isFinite(maxHtmlSizeBytes) ? maxHtmlSizeBytes : 750000
+      maxHtmlSizeBytes: Number.isFinite(maxHtmlSizeBytes) ? maxHtmlSizeBytes : 750000,
+      includeImage: includeImageCheckbox.checked,
+      includePdf: includePdfCheckbox.checked,
+      includeHtml: includeHtmlCheckbox.checked,
+      includeSourceCode: includeSourceCodeCheckbox.checked
     });
     setStatus('Saved.');
     await refreshDiagnostics();

@@ -20,6 +20,7 @@ export interface CapturePayload {
   html: string;
   sourceCode: string;
   screenshotBase64: string;
+  pdfBase64?: string;
   timestamp: string;
   reason: 'command' | 'popup' | 'auto';
   metadataOnly?: boolean;
@@ -45,6 +46,10 @@ export interface ExtensionSettings {
   authUsername: string;
   metadataOnlyMode: boolean;
   maxHtmlSizeBytes: number;
+  includeImage: boolean;
+  includePdf: boolean;
+  includeHtml: boolean;
+  includeSourceCode: boolean;
   lastSuccessAt: string;
   lastError: string;
   pendingUploads: number;
