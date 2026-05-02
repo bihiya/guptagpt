@@ -344,9 +344,21 @@ async function syncAutoMode(): Promise<void> {
 async function healthCheck(): Promise<{ ok: boolean; status?: number; error?: string }> {
   try {
     const settings = await getSettings();
-    const endpoint = new URL('/health', settings.backendBaseUrl).toString();
-    const response = await fetch(endpoint, { method: 'GET' });
-    return { ok: response.ok, status: response.status };
+    const candidates = ['/health', '/api/health'];
+    const failures: string[] = [];
+
+    for (const path of candidates) {
+      const endpoint = new URL(path, settings.backendBaseUrl).toString();
+      try {
+        const response = await fetch(endpoint, { method: 'GET', cache: 'no-store' });
+        if (response.ok) return { ok: true, status: response.status };
+        failures.push(`${path} -> ${response.status}`);
+      } catch (error) {
+        failures.push(`${path} -> ${String(error)}`);
+      }
+    }
+
+    return { ok: false, error: failures.join('; ') || 'No health endpoint responded.' };
   } catch (error) {
     return { ok: false, error: String(error) };
   }

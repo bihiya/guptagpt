@@ -44,6 +44,7 @@ async function refreshDiagnostics(): Promise<void> {
 }
 
 async function runHealthCheck(): Promise<void> {
+  healthStatusEl.textContent = 'Health: checking...';
   const response = await chrome.runtime.sendMessage({ type: 'HEALTH_CHECK' });
   healthStatusEl.textContent = response?.ok ? `Health: OK (${response?.status ?? ''})` : `Health: FAIL (${response?.error ?? response?.status ?? 'unknown'})`;
 }
