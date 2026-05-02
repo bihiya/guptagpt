@@ -5,6 +5,7 @@ import type { CaptureRequestBody } from '../types.js';
 
 const router = Router();
 const REASONS = new Set(['command', 'popup', 'auto']);
+const MAX_PDF_SIZE = 10 * 1024 * 1024;
 
 function isValidPayload(body: Partial<CaptureRequestBody>): body is CaptureRequestBody {
   if (!body.url || !body.title || typeof body.html !== 'string' || typeof body.sourceCode !== 'string' || typeof body.screenshotBase64 !== 'string' || !body.timestamp || !body.reason) {
