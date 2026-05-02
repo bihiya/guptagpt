@@ -17,7 +17,7 @@ For local development without a MongoDB service, run:
 
 ## Frontend
 - Copy `web/.env.example` to `web/.env`
-- Set `VITE_EXTENSION_ID`
+- Set `VITE_EXTENSION_ID` (supports comma-separated extension IDs)
 - (Optional) set `VITE_GOOGLE_CLIENT_ID` to show Google login
 - `cd web && npm install && npm run dev`
 
