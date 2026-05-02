@@ -1,6 +1,6 @@
 import { getSettings, setSettings } from '../utils/storage.js';
 
-const intervalInput = document.getElementById('intervalMs') as HTMLInputElement;
+const intervalSelect = document.getElementById('intervalMinutes') as HTMLSelectElement;
 const autoModeCheckbox = document.getElementById('autoModeEnabled') as HTMLInputElement;
 const metadataOnlyModeCheckbox = document.getElementById('metadataOnlyMode') as HTMLInputElement;
 const maxHtmlSizeBytesInput = document.getElementById('maxHtmlSizeBytes') as HTMLInputElement;
@@ -19,11 +19,29 @@ const healthStatusEl = document.getElementById('healthStatus') as HTMLElement;
 
 function setStatus(message: string): void { statusEl.textContent = message; }
 
+const MINUTE_OPTIONS = [1, 2, 5, 10, 15, 30, 60] as const;
+
+function millisecondsToMinutes(ms: number): number {
+  const rawMinutes = Math.max(1, Math.round(ms / 60000));
+  const exact = MINUTE_OPTIONS.find((m) => m === rawMinutes);
+  if (exact) return exact;
+  return MINUTE_OPTIONS.reduce((best, cur) => (Math.abs(cur - rawMinutes) < Math.abs(best - rawMinutes) ? cur : best), MINUTE_OPTIONS[0]);
+}
+
+function updateIntervalState(): void {
+  intervalSelect.disabled = !autoModeCheckbox.checked;
+}
+
 async function refreshDiagnostics(): Promise<void> {
   const settings = await getSettings();
   pendingUploadsEl.textContent = `Pending uploads: ${settings.pendingUploads}`;
-  lastSuccessAtEl.textContent = `Last success: ${settings.lastSuccessAt || '—'}`;
+  lastSuccessAtEl.textContent = `Last success: ${settings.lastSuccessAt ? new Date(settings.lastSuccessAt).toLocaleString() : '—'}`;
   lastErrorEl.textContent = `Last error: ${settings.lastError || '—'}`;
+}
+
+async function runHealthCheck(): Promise<void> {
+  const response = await chrome.runtime.sendMessage({ type: 'HEALTH_CHECK' });
+  healthStatusEl.textContent = response?.ok ? `Health: OK (${response?.status ?? ''})` : `Health: FAIL (${response?.error ?? response?.status ?? 'unknown'})`;
 }
 
 async function triggerCapture(): Promise<void> {
@@ -38,16 +56,18 @@ async function triggerCapture(): Promise<void> {
 
     const response = await chrome.runtime.sendMessage({ type: 'CAPTURE_NOW' });
     setStatus(response?.ok ? `Capture queued. Pending: ${response.pendingUploads ?? 0}` : `Capture failed: ${response?.error ?? 'Unknown error'}`);
-    await refreshDiagnostics();
   } catch (error) {
     setStatus(`Capture failed: ${String(error)}`);
+  } finally {
+    await refreshDiagnostics();
   }
 }
 
 async function load(): Promise<void> {
   const settings = await getSettings();
-  intervalInput.value = String(settings.autoModeIntervalMs);
+  intervalSelect.value = String(millisecondsToMinutes(settings.autoModeIntervalMs));
   autoModeCheckbox.checked = settings.autoModeEnabled;
+  updateIntervalState();
   metadataOnlyModeCheckbox.checked = settings.metadataOnlyMode;
   maxHtmlSizeBytesInput.value = String(settings.maxHtmlSizeBytes);
   const name = settings.authUsername || settings.authEmail || 'Guest';
@@ -55,15 +75,16 @@ async function load(): Promise<void> {
   authEmailEl.textContent = settings.authEmail || 'Not logged in';
   logoutBtn.disabled = !settings.authToken;
   await refreshDiagnostics();
+  await runHealthCheck();
 }
 
 saveBtn.addEventListener('click', async () => {
   try {
-    const interval = Number(intervalInput.value);
+    const minutes = Number(intervalSelect.value);
     const maxHtmlSizeBytes = Number(maxHtmlSizeBytesInput.value);
     await setSettings({
       autoModeEnabled: autoModeCheckbox.checked,
-      autoModeIntervalMs: Number.isFinite(interval) ? interval : 15000,
+      autoModeIntervalMs: Number.isFinite(minutes) ? minutes * 60000 : 15 * 60000,
       metadataOnlyMode: metadataOnlyModeCheckbox.checked,
       maxHtmlSizeBytes: Number.isFinite(maxHtmlSizeBytes) ? maxHtmlSizeBytes : 750000
     });
@@ -74,6 +95,8 @@ saveBtn.addEventListener('click', async () => {
   }
 });
 
+autoModeCheckbox.addEventListener('change', updateIntervalState);
+
 captureBtn.addEventListener('click', () => { void triggerCapture(); });
 retryBtn.addEventListener('click', async () => {
   const response = await chrome.runtime.sendMessage({ type: 'RETRY_PENDING_UPLOADS' });
@@ -82,8 +105,7 @@ retryBtn.addEventListener('click', async () => {
 });
 
 healthBtn.addEventListener('click', async () => {
-  const response = await chrome.runtime.sendMessage({ type: 'HEALTH_CHECK' });
-  healthStatusEl.textContent = response?.ok ? `Health: OK (${response?.status ?? ''})` : `Health: FAIL (${response?.error ?? response?.status ?? 'unknown'})`;
+  await runHealthCheck();
 });
 
 load().catch((error: unknown) => setStatus(`Failed to load settings: ${String(error)}`));

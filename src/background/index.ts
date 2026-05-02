@@ -249,6 +249,21 @@ async function captureAndQueue(reason: 'command' | 'popup' | 'auto'): Promise<vo
     queue.push({ id: `${Date.now()}-${Math.random()}`, payload, attempts: 0, nextRetryAt: Date.now() });
     await setQueue(queue);
     await flushQueue();
+  } catch (error) {
+    const current = await getSettings();
+    const cat = categorizeError(error);
+    await setSettings({
+      lastError: String(error),
+      telemetry: {
+        ...current.telemetry,
+        failure: current.telemetry.failure + 1,
+        failureCategories: {
+          ...current.telemetry.failureCategories,
+          [cat]: (current.telemetry.failureCategories[cat] ?? 0) + 1
+        }
+      }
+    });
+    throw error;
   } finally {
     isCapturing = false;
   }
