@@ -4,6 +4,7 @@ export interface CaptureRequestBody {
   html: string;
   sourceCode: string;
   screenshotBase64: string;
+  pdfBase64?: string;
   timestamp: string;
   reason: 'command' | 'popup' | 'auto';
 }
