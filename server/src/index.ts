@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import compression from 'compression';
 import { connectDb } from './config/db.js';
 import { env } from './config/env.js';
 import authRoutes from './routes/authRoutes.js';
@@ -8,6 +9,10 @@ import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 
+app.disable('x-powered-by');
+app.set('etag', 'strong');
+
+app.use(compression({ threshold: 1024 }));
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -25,6 +30,7 @@ app.use(
 app.use(express.json({ limit: '25mb' }));
 
 app.get('/health', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   res.json({ ok: true, uptime: process.uptime() });
 });
 
