@@ -6,9 +6,7 @@ let autoCaptureTimer: number | null = null;
 let isCapturing = false;
 let queueRetryTimer: number | null = null;
 
-const MAX_SCREENSHOT_BYTES = 3_500_000;
-const MIN_SCREENSHOT_CAPTURE_INTERVAL_MS = 1200;
-let lastScreenshotCaptureAt = 0;
+const MAX_SCREENSHOT_BYTES = 1_500_000;
 
 function estimateBase64Bytes(base64: string): number {
   return Math.floor((base64.length * 3) / 4);
@@ -170,7 +168,7 @@ async function buildPayload(reason: 'command' | 'popup' | 'auto'): Promise<Captu
     url: captureData.url,
     title: captureData.title,
     html: settings.metadataOnlyMode ? '' : cappedHtml,
-    sourceCode: settings.metadataOnlyMode ? '' : cappedHtml,
+    sourceCode: '',
     screenshotBase64,
     timestamp: captureData.timestamp,
     reason,
