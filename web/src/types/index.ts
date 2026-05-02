@@ -5,6 +5,7 @@ export interface CaptureItem {
   html: string;
   sourceCode: string;
   screenshotBase64: string;
+  pdfBase64?: string;
   reason: 'command' | 'popup' | 'auto';
   timestamp: string;
   createdAt: string;

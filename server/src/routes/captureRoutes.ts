@@ -7,10 +7,15 @@ const router = Router();
 const MAX_HTML_SIZE = 2_000_000;
 const MAX_SOURCE_SIZE = 2_000_000;
 const MAX_IMAGE_SIZE = 10_000_000;
+const MAX_PDF_SIZE = 20_000_000;
 const REASONS = new Set(['command', 'popup', 'auto']);
 
 function isValidPayload(body: Partial<CaptureRequestBody>): body is CaptureRequestBody {
   if (!body.url || !body.title || typeof body.html !== 'string' || typeof body.sourceCode !== 'string' || typeof body.screenshotBase64 !== 'string' || !body.timestamp || !body.reason) {
+    return false;
+  }
+
+  if (body.pdfBase64 !== undefined && typeof body.pdfBase64 !== 'string') {
     return false;
   }
 
@@ -24,11 +29,26 @@ function isValidPayload(body: Partial<CaptureRequestBody>): body is CaptureReque
     return false;
   }
 
-  if (body.html.length > MAX_HTML_SIZE || body.sourceCode.length > MAX_SOURCE_SIZE || body.screenshotBase64.length > MAX_IMAGE_SIZE) {
+  if (
+    body.html.length > MAX_HTML_SIZE
+    || body.sourceCode.length > MAX_SOURCE_SIZE
+    || body.screenshotBase64.length > MAX_IMAGE_SIZE
+  ) {
     return false;
   }
 
   return !Number.isNaN(Date.parse(body.timestamp));
+}
+
+function sanitizePayload(body: CaptureRequestBody): CaptureRequestBody {
+  if ((body.pdfBase64?.length ?? 0) <= MAX_PDF_SIZE) {
+    return body;
+  }
+
+  return {
+    ...body,
+    pdfBase64: ''
+  };
 }
 
 router.post('/capture', requireAuth, async (req, res, next) => {
@@ -39,7 +59,7 @@ router.post('/capture', requireAuth, async (req, res, next) => {
       return;
     }
 
-    const capture = await createCapture(body, req.authUser!.id);
+    const capture = await createCapture(sanitizePayload(body), req.authUser!.id);
     res.status(201).json({ id: capture.id });
   } catch (error) {
     next(error);
