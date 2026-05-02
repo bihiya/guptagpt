@@ -25,6 +25,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
+import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import type { CaptureItem } from '../types';
 
 type CaptureTab = 'photo' | 'html' | 'source';
@@ -58,6 +59,7 @@ function downloadFile(name: string, content: string, type: string) {
 function CaptureTabs({ item, compareItem }: { item: CaptureItem; compareItem?: CaptureItem }) {
   const [activeTab, setActiveTab] = useState<CaptureTab>('photo');
   const [copied, setCopied] = useState(false);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
 
   const copyActiveContent = async () => {
     const content = activeTab === 'html' ? item.html : activeTab === 'source' ? item.sourceCode : item.url;
@@ -70,7 +72,8 @@ function CaptureTabs({ item, compareItem }: { item: CaptureItem; compareItem?: C
   const compareText = compareItem ? (activeTab === 'html' ? compareItem.html : compareItem.sourceCode) : '';
 
   return (
-    <Box>
+    <>
+      <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
         <Tabs value={activeTab} onChange={(_e, v) => setActiveTab(v)}>
           <Tab value="photo" label="Photo" />
@@ -83,7 +86,21 @@ function CaptureTabs({ item, compareItem }: { item: CaptureItem; compareItem?: C
         </Stack>
       </Stack>
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 1.5, bgcolor: '#f8fafc' }}>
-        {activeTab === 'photo' && <Box component="img" src={`data:image/png;base64,${item.screenshotBase64}`} alt={item.title} sx={{ width: '100%', maxHeight: 420, objectFit: 'contain' }} />}
+        {activeTab === 'photo' && (
+          <Stack spacing={1}>
+            <Box
+              component="img"
+              src={`data:image/png;base64,${item.screenshotBase64}`}
+              alt={item.title}
+              sx={{ width: '100%', maxHeight: 420, objectFit: 'contain' }}
+            />
+            <Stack direction="row" justifyContent="flex-end">
+              <Button size="small" startIcon={<ZoomInIcon />} onClick={() => setImageDialogOpen(true)}>
+                Full view (zoom)
+              </Button>
+            </Stack>
+          </Stack>
+        )}
         {activeTab !== 'photo' && compareItem && (
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
             <Box component="pre" sx={{ flex: 1, maxHeight: 320, overflow: 'auto' }}>{getPreviewText(currentText)}</Box>
@@ -93,6 +110,20 @@ function CaptureTabs({ item, compareItem }: { item: CaptureItem; compareItem?: C
         {activeTab !== 'photo' && !compareItem && <Box component="pre" sx={{ maxHeight: 320, overflow: 'auto' }}>{getPreviewText(currentText)}</Box>}
       </Box>
     </Box>
+      <Dialog open={imageDialogOpen} onClose={() => setImageDialogOpen(false)} maxWidth="xl" fullWidth>
+        <DialogTitle>{item.title}</DialogTitle>
+        <DialogContent sx={{ p: 1 }}>
+          <Box sx={{ overflow: 'auto', maxHeight: '80vh', bgcolor: '#0f172a', borderRadius: 1 }}>
+            <Box
+              component="img"
+              src={`data:image/png;base64,${item.screenshotBase64}`}
+              alt={`${item.title} full view`}
+              sx={{ display: 'block', width: '100%', minWidth: 1000, objectFit: 'contain' }}
+            />
+          </Box>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
