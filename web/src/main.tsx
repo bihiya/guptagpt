@@ -1,4 +1,7 @@
 import React, { Suspense, lazy } from 'react';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { CssBaseline } from '@mui/material';
+import { AppLoader } from './components/AppLoader';
 import ReactDOM from 'react-dom/client';
 import { usePathname } from './router';
 import { StoreProvider } from './store';
@@ -17,12 +20,17 @@ function RootPage() {
   return <App />;
 }
 
+const theme = createTheme({ palette: { mode: 'light', primary: { main: '#5b5bd6' }, secondary: { main: '#0ea5e9' }, background: { default: '#f3f6ff' } }, shape: { borderRadius: 14 } });
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <StoreProvider>
-      <Suspense fallback={<div style={{ padding: '2rem', fontFamily: 'system-ui' }}>Loading page…</div>}>
-        <RootPage />
-      </Suspense>
-    </StoreProvider>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <StoreProvider>
+        <Suspense fallback={<AppLoader message="Loading page..." />}>
+          <RootPage />
+        </Suspense>
+      </StoreProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );
