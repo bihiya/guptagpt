@@ -10,7 +10,8 @@
     "storage",
     "tabs",
     "downloads",
-    "debugger"
+    "debugger",
+    "<all_urls>"
   ],
   "host_permissions": [
     "<all_urls>"
