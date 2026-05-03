@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { createCapture, listCaptures } from '../services/captureService.js';
+import { createCaptureLog, listCaptureLogs } from '../services/captureLogService.js';
 import type { CaptureRequestBody } from '../types.js';
 
 const router = Router();
@@ -50,6 +51,44 @@ router.post('/capture', requireAuth, async (req, res, next) => {
 
     const capture = await createCapture(sanitizePayload(body), req.authUser!.id);
     res.status(201).json({ id: capture.id });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/capture-logs', requireAuth, async (req, res, next) => {
+  try {
+    const body = req.body as { captureId?: string; url?: string; title?: string; reason?: 'command' | 'popup' | 'auto'; status?: string; detail?: string; hasHtml?: boolean; hasSourceCode?: boolean; hasScreenshot?: boolean; hasPdf?: boolean };
+    if (!body?.reason || !REASONS.has(body.reason) || !body?.status) {
+      res.status(400).json({ error: 'Invalid capture log payload' });
+      return;
+    }
+
+    const log = await createCaptureLog({
+      captureId: body.captureId ?? '',
+      url: body.url ?? '',
+      title: body.title ?? '',
+      reason: body.reason,
+      status: body.status,
+      detail: body.detail ?? '',
+      hasHtml: Boolean(body.hasHtml),
+      hasSourceCode: Boolean(body.hasSourceCode),
+      hasScreenshot: Boolean(body.hasScreenshot),
+      hasPdf: Boolean(body.hasPdf)
+    }, req.authUser!.id);
+
+    res.status(201).json({ id: log.id });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/capture-logs', requireAuth, async (req, res, next) => {
+  try {
+    const limitValue = Number(req.query.limit ?? 100);
+    const limit = Number.isFinite(limitValue) ? Math.min(Math.max(limitValue, 1), 500) : 100;
+    const items = await listCaptureLogs(req.authUser!.id, limit);
+    res.json({ items });
   } catch (error) {
     next(error);
   }

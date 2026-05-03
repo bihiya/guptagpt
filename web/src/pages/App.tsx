@@ -93,6 +93,7 @@ export function App() {
           <Stack direction="row" spacing={1} alignItems="center">
             <Chip size="small" label={isLoggedIn ? 'Authenticated' : 'Guest'} color={isLoggedIn ? 'success' : 'default'} />
             <Button color="inherit" onClick={() => navigate('/settings')}>Settings</Button>
+            <Button color="inherit" onClick={() => navigate('/logs')}>Logs</Button>
             {isLoggedIn && <Button color="inherit" onClick={() => void loadCaptures(savedAuth?.token ?? '')}>Refresh</Button>}
             {isLoggedIn && <Button color="inherit" onClick={() => void syncToExtension('login')}>Sync Login → Ext</Button>}
             <Button color="inherit" onClick={() => void syncToExtension('logout')}>Sync Logout → Ext</Button>

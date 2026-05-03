@@ -24,6 +24,8 @@ const healthStatusEl = document.getElementById('healthStatus') as HTMLElement;
 const logsToggleBtn = document.getElementById('logsToggleBtn') as HTMLButtonElement;
 const logsPanelEl = document.getElementById('logsPanel') as HTMLElement;
 const captureLogsEl = document.getElementById('captureLogs') as HTMLElement;
+const queuedListEl = document.getElementById('queuedList') as HTMLElement;
+const cancelAllQueuedBtn = document.getElementById('cancelAllQueuedBtn') as HTMLButtonElement;
 
 type CaptureLogEntry = {
   id: string;
@@ -33,6 +35,13 @@ type CaptureLogEntry = {
   status: 'queued' | 'uploading' | 'success' | 'failed';
   message: string;
   createdAt: string;
+};
+type QueueListItem = {
+  id: string;
+  payload: { url: string; title: string; reason: 'command' | 'popup' | 'auto'; screenshotBase64?: string; pdfBase64?: string; html?: string; sourceCode?: string };
+  attempts: number;
+  nextRetryAt: number;
+  lastError?: string;
 };
 
 function setStatus(message: string): void { statusEl.textContent = message; }
@@ -76,6 +85,38 @@ async function renderCaptureLogs(): Promise<void> {
       <small>${entry.message}</small>
     </article>
   `).join('');
+}
+
+async function renderQueuedCaptures(): Promise<void> {
+  const response = await chrome.runtime.sendMessage({ type: 'GET_QUEUE_ITEMS' });
+  const items = (response?.items as QueueListItem[] | undefined) ?? [];
+  if (!items.length) {
+    queuedListEl.innerHTML = '<div class="log-item">No queued captures.</div>';
+    cancelAllQueuedBtn.disabled = true;
+    return;
+  }
+  cancelAllQueuedBtn.disabled = false;
+  queuedListEl.innerHTML = items.map((item) => `
+    <article class="log-item">
+      <strong>QUEUED</strong><br/>
+      <small>${new Date(item.nextRetryAt).toLocaleString()} · attempt ${item.attempts}</small><br/>
+      <small>${item.payload.title || item.payload.url}</small><br/>
+      <small>${item.payload.reason} · ${item.payload.pdfBase64 ? 'pdf' : 'no-pdf'} · ${item.payload.screenshotBase64 ? 'image' : 'no-image'}</small><br/>
+      <button class="save-button cancel-queue-item" data-id="${item.id}" type="button">Cancel this queued capture</button>
+    </article>
+  `).join('');
+
+  queuedListEl.querySelectorAll<HTMLButtonElement>('.cancel-queue-item').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const id = button.dataset.id ?? '';
+      if (!id) return;
+      const cancelResponse = await chrome.runtime.sendMessage({ type: 'CANCEL_QUEUE_ITEM', id });
+      setStatus(cancelResponse?.ok ? 'Queued capture canceled.' : `Cancel failed: ${cancelResponse?.error ?? 'Unknown error'}`);
+      await refreshDiagnostics();
+      await renderQueuedCaptures();
+      await renderCaptureLogs();
+    });
+  });
 }
 
 async function runHealthCheck(): Promise<void> {
@@ -124,6 +165,7 @@ async function load(): Promise<void> {
   logoutBtn.disabled = !settings.authToken;
   await refreshDiagnostics();
   await renderCaptureLogs();
+  await renderQueuedCaptures();
   await runHealthCheck();
 }
 
@@ -170,8 +212,17 @@ healthBtn.addEventListener('click', async () => {
 logsToggleBtn.addEventListener('click', async () => {
   logsPanelEl.classList.toggle('hidden');
   if (!logsPanelEl.classList.contains('hidden')) {
+    await renderQueuedCaptures();
     await renderCaptureLogs();
   }
+});
+
+cancelAllQueuedBtn.addEventListener('click', async () => {
+  const response = await chrome.runtime.sendMessage({ type: 'CANCEL_ALL_QUEUED' });
+  setStatus(response?.ok ? `Canceled ${response.count ?? 0} queued captures.` : `Cancel all failed: ${response?.error ?? 'Unknown error'}`);
+  await refreshDiagnostics();
+  await renderQueuedCaptures();
+  await renderCaptureLogs();
 });
 
 load().catch((error: unknown) => setStatus(`Failed to load settings: ${String(error)}`));
