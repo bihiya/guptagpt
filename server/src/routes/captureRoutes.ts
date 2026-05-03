@@ -6,7 +6,21 @@ import type { CaptureRequestBody } from '../types.js';
 
 const router = Router();
 const REASONS = new Set(['command', 'popup', 'auto']);
-const MAX_PDF_SIZE = 10 * 1024 * 1024;
+const MAX_HTML_BYTES = 8 * 1024 * 1024;
+const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
+const MAX_SCREENSHOT_BYTES = 3 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+
+function estimateUtf8Bytes(value: string): number {
+  return new TextEncoder().encode(value).length;
+}
+
+function estimateBase64Bytes(value: string): number {
+  const normalized = value.trim();
+  if (!normalized) return 0;
+  const padding = normalized.endsWith('==') ? 2 : normalized.endsWith('=') ? 1 : 0;
+  return Math.max(0, Math.floor((normalized.length * 3) / 4) - padding);
+}
 
 function isValidPayload(body: Partial<CaptureRequestBody>): body is CaptureRequestBody {
   if (!body.url || !body.title || typeof body.html !== 'string' || typeof body.sourceCode !== 'string' || typeof body.screenshotBase64 !== 'string' || !body.timestamp || !body.reason) {
@@ -30,15 +44,18 @@ function isValidPayload(body: Partial<CaptureRequestBody>): body is CaptureReque
   return !Number.isNaN(Date.parse(body.timestamp));
 }
 
-function sanitizePayload(body: CaptureRequestBody): CaptureRequestBody {
-  if ((body.pdfBase64?.length ?? 0) <= MAX_PDF_SIZE) {
-    return body;
-  }
+function validatePayloadSize(body: CaptureRequestBody): string | null {
+  const htmlBytes = estimateUtf8Bytes(body.html);
+  const sourceBytes = estimateUtf8Bytes(body.sourceCode);
+  const screenshotBytes = estimateBase64Bytes(body.screenshotBase64);
+  const pdfBytes = estimateBase64Bytes(body.pdfBase64 ?? '');
+  const totalBytes = htmlBytes + sourceBytes + screenshotBytes + pdfBytes;
 
-  return {
-    ...body,
-    pdfBase64: ''
-  };
+  if (htmlBytes > MAX_HTML_BYTES) return `html exceeds ${MAX_HTML_BYTES} bytes`;
+  if (sourceBytes > MAX_SOURCE_BYTES) return `sourceCode exceeds ${MAX_SOURCE_BYTES} bytes`;
+  if (screenshotBytes > MAX_SCREENSHOT_BYTES) return `screenshotBase64 exceeds ${MAX_SCREENSHOT_BYTES} bytes`;
+  if (totalBytes > MAX_TOTAL_BYTES) return `total payload exceeds ${MAX_TOTAL_BYTES} bytes`;
+  return null;
 }
 
 router.post('/capture', requireAuth, async (req, res, next) => {
@@ -49,7 +66,13 @@ router.post('/capture', requireAuth, async (req, res, next) => {
       return;
     }
 
-    const capture = await createCapture(sanitizePayload(body), req.authUser!.id);
+    const sizeError = validatePayloadSize(body);
+    if (sizeError) {
+      res.status(413).json({ error: `Capture payload too large: ${sizeError}` });
+      return;
+    }
+
+    const capture = await createCapture(body, req.authUser!.id);
     res.status(201).json({ id: capture.id });
   } catch (error) {
     next(error);
