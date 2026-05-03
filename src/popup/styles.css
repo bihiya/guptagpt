@@ -188,11 +188,13 @@ button:hover {
 .toggle-row strong {
   color: #334155;
   font-size: 13px;
+  text-align: left;
 }
 
 .toggle-row small {
   color: #64748b;
   font-size: 12px;
+  text-align: left;
 }
 
 .toggle-row input[type='checkbox'] {
@@ -205,11 +207,41 @@ button:hover {
 .status {
   margin: 0;
   padding: 11px 12px;
-  text-align: right;
+  text-align: left;
   color: #475569;
   font-size: 12px;
   font-weight: 700;
   background: rgba(255, 255, 255, 0.8);
+}
+
+.logs-toggle-button {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  width: auto;
+  color: #172033;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.hidden { display: none; }
+
+.logs-panel {
+  max-height: 240px;
+  overflow: auto;
+}
+
+.capture-logs {
+  display: grid;
+  gap: 8px;
+}
+
+.log-item {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  text-align: left;
 }
 
 .auth-summary {

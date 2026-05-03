@@ -1,4 +1,5 @@
 import { getSettings, setSettings } from '../utils/storage.js';
+import { CAPTURE_LOGS_KEY } from '../utils/constants.js';
 
 const intervalSelect = document.getElementById('intervalMinutes') as HTMLSelectElement;
 const autoModeCheckbox = document.getElementById('autoModeEnabled') as HTMLInputElement;
@@ -20,6 +21,19 @@ const pendingUploadsEl = document.getElementById('pendingUploads') as HTMLElemen
 const lastSuccessAtEl = document.getElementById('lastSuccessAt') as HTMLElement;
 const lastErrorEl = document.getElementById('lastError') as HTMLElement;
 const healthStatusEl = document.getElementById('healthStatus') as HTMLElement;
+const logsToggleBtn = document.getElementById('logsToggleBtn') as HTMLButtonElement;
+const logsPanelEl = document.getElementById('logsPanel') as HTMLElement;
+const captureLogsEl = document.getElementById('captureLogs') as HTMLElement;
+
+type CaptureLogEntry = {
+  id: string;
+  url: string;
+  title: string;
+  reason: 'command' | 'popup' | 'auto';
+  status: 'queued' | 'uploading' | 'success' | 'failed';
+  message: string;
+  createdAt: string;
+};
 
 function setStatus(message: string): void { statusEl.textContent = message; }
 
@@ -45,6 +59,23 @@ async function refreshDiagnostics(): Promise<void> {
   pendingUploadsEl.textContent = `Pending uploads: ${settings.pendingUploads}`;
   lastSuccessAtEl.textContent = `Last success: ${settings.lastSuccessAt ? new Date(settings.lastSuccessAt).toLocaleString() : '—'}`;
   lastErrorEl.textContent = `Last error: ${settings.lastError || '—'}`;
+}
+
+async function renderCaptureLogs(): Promise<void> {
+  const data = await chrome.storage.local.get(CAPTURE_LOGS_KEY);
+  const logs = (data[CAPTURE_LOGS_KEY] as CaptureLogEntry[] | undefined) ?? [];
+  if (!logs.length) {
+    captureLogsEl.innerHTML = '<div class="log-item">No captures yet.</div>';
+    return;
+  }
+  captureLogsEl.innerHTML = logs.map((entry) => `
+    <article class="log-item">
+      <strong>${entry.status.toUpperCase()}</strong><br/>
+      <small>${new Date(entry.createdAt).toLocaleString()} · ${entry.reason}</small><br/>
+      <small>${entry.title || entry.url}</small><br/>
+      <small>${entry.message}</small>
+    </article>
+  `).join('');
 }
 
 async function runHealthCheck(): Promise<void> {
@@ -92,6 +123,7 @@ async function load(): Promise<void> {
   authEmailEl.textContent = settings.authEmail || 'Not logged in';
   logoutBtn.disabled = !settings.authToken;
   await refreshDiagnostics();
+  await renderCaptureLogs();
   await runHealthCheck();
 }
 
@@ -133,6 +165,13 @@ retryBtn.addEventListener('click', async () => {
 
 healthBtn.addEventListener('click', async () => {
   await runHealthCheck();
+});
+
+logsToggleBtn.addEventListener('click', async () => {
+  logsPanelEl.classList.toggle('hidden');
+  if (!logsPanelEl.classList.contains('hidden')) {
+    await renderCaptureLogs();
+  }
 });
 
 load().catch((error: unknown) => setStatus(`Failed to load settings: ${String(error)}`));
