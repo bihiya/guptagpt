@@ -4,11 +4,14 @@ import {
   AccordionSummary,
   Box,
   Chip,
+  IconButton,
   Link,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { getSavedAuth } from '../auth';
 import { useEffect, useMemo, useState } from 'react';
 import { fetchCaptureLogs } from '../services/api';
@@ -40,10 +43,15 @@ export function LogsPage() {
   const [items, setItems] = useState<CaptureLogItem[]>([]);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const loadLogs = () => {
     const auth = getSavedAuth();
     if (!auth?.token) return;
+    setError('');
     fetchCaptureLogs(auth.token).then(setItems).catch((e) => setError(String(e)));
+  };
+
+  useEffect(() => {
+    loadLogs();
   }, []);
 
   const groupedLogs = useMemo<CaptureLogGroup[]>(() => {
@@ -78,7 +86,14 @@ export function LogsPage() {
   }, [items]);
 
   return <Box sx={{ p: 3 }}>
-    <Typography variant='h4' mb={2}>Capture Lifecycle Logs</Typography>
+    <Stack direction='row' alignItems='center' justifyContent='space-between' mb={2}>
+      <Typography variant='h4'>Capture Lifecycle Logs</Typography>
+      <Tooltip title='Refresh logs'>
+        <IconButton onClick={loadLogs} color='primary'>
+          <RefreshIcon />
+        </IconButton>
+      </Tooltip>
+    </Stack>
     {error && <Typography color='error'>{error}</Typography>}
 
     <Stack spacing={1.5}>
