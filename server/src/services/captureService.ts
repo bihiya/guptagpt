@@ -14,7 +14,16 @@ export async function createCapture(payload: CaptureRequestBody, userId: string)
     if (existing) return existing;
   }
 
-  return CaptureModel.create(doc);
+  try {
+    return await CaptureModel.create(doc);
+  } catch (error) {
+    const maybeMongoError = error as { code?: number };
+    if (doc.captureId && maybeMongoError?.code === 11000) {
+      const existing = await CaptureModel.findOne({ userId, captureId: doc.captureId });
+      if (existing) return existing;
+    }
+    throw error;
+  }
 }
 
 export async function listCaptures(userId: string, limit = 20) {
