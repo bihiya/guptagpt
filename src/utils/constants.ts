@@ -28,3 +28,4 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
 
 export const STORAGE_KEY = 'captureSettings';
 export const QUEUE_KEY = 'captureQueue';
+export const CAPTURE_LOGS_KEY = 'captureLogs';

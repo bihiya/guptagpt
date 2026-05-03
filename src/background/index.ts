@@ -1,11 +1,29 @@
 import type { CaptureDataMessage, CapturePayload } from '../types/messages.js';
 import { getSettings, setSettings } from '../utils/storage.js';
-import { QUEUE_KEY } from '../utils/constants.js';
+import { CAPTURE_LOGS_KEY, QUEUE_KEY } from '../utils/constants.js';
 
 let autoCaptureTimer: number | null = null;
 let isCapturing = false;
 let queueRetryTimer: number | null = null;
 let lastScreenshotCaptureAt = 0;
+const MAX_CAPTURE_LOGS = 50;
+
+type CaptureLogEntry = {
+  id: string;
+  url: string;
+  title: string;
+  reason: 'command' | 'popup' | 'auto';
+  status: 'queued' | 'uploading' | 'success' | 'failed';
+  message: string;
+  createdAt: string;
+};
+
+async function appendCaptureLog(entry: CaptureLogEntry): Promise<void> {
+  const data = await chrome.storage.local.get(CAPTURE_LOGS_KEY);
+  const logs = (data[CAPTURE_LOGS_KEY] as CaptureLogEntry[] | undefined) ?? [];
+  logs.unshift(entry);
+  await chrome.storage.local.set({ [CAPTURE_LOGS_KEY]: logs.slice(0, MAX_CAPTURE_LOGS) });
+}
 
 const MAX_SCREENSHOT_BYTES = 1_500_000;
 const MIN_SCREENSHOT_CAPTURE_INTERVAL_MS = 1200;
@@ -262,7 +280,25 @@ async function flushQueue(): Promise<void> {
     }
     try {
       isCapturing = true;
+      await appendCaptureLog({
+        id: item.id,
+        url: item.payload.url,
+        title: item.payload.title,
+        reason: item.payload.reason,
+        status: 'uploading',
+        message: 'Uploading capture to server.',
+        createdAt: new Date().toISOString()
+      });
       await postPayload(item.payload);
+      await appendCaptureLog({
+        id: item.id,
+        url: item.payload.url,
+        title: item.payload.title,
+        reason: item.payload.reason,
+        status: 'success',
+        message: 'Capture uploaded successfully.',
+        createdAt: new Date().toISOString()
+      });
       isCapturing = false;
     } catch (error) {
       isCapturing = false;
@@ -282,6 +318,15 @@ async function flushQueue(): Promise<void> {
             [cat]: (current.telemetry.failureCategories[cat] ?? 0) + 1
           }
         }
+      });
+      await appendCaptureLog({
+        id: item.id,
+        url: item.payload.url,
+        title: item.payload.title,
+        reason: item.payload.reason,
+        status: 'failed',
+        message: lastError,
+        createdAt: new Date().toISOString()
       });
     }
   }
@@ -306,7 +351,17 @@ async function captureAndQueue(reason: 'command' | 'popup' | 'auto'): Promise<vo
   try {
     const payload = await buildPayload(reason);
     const queue = await getQueue();
-    queue.push({ id: `${Date.now()}-${Math.random()}`, payload, attempts: 0, nextRetryAt: Date.now() });
+    const id = `${Date.now()}-${Math.random()}`;
+    queue.push({ id, payload, attempts: 0, nextRetryAt: Date.now() });
+    await appendCaptureLog({
+      id,
+      url: payload.url,
+      title: payload.title,
+      reason: payload.reason,
+      status: 'queued',
+      message: 'Capture queued and waiting for upload.',
+      createdAt: new Date().toISOString()
+    });
     await setQueue(queue);
     await flushQueue();
   } catch (error) {

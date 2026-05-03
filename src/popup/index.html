@@ -12,6 +12,7 @@
         <div class="badge">Page Capture</div>
         <h1>Capture Studio</h1>
         <p>Save the tab photo, full HTML, and source code in one click.</p>
+        <button id="logsToggleBtn" class="logs-toggle-button" type="button" aria-label="Open capture logs">📋 Logs</button>
         <button id="captureBtn" class="capture-button" type="button">
           <span aria-hidden="true">●</span>
           Capture current tab
@@ -93,6 +94,13 @@
       </section>
 
       <p id="status" class="status" role="status">Ready to capture.</p>
+      <section id="logsPanel" class="card logs-panel hidden">
+        <div class="section-title">
+          <span>Capture status</span>
+          <small>Recent activity</small>
+        </div>
+        <div id="captureLogs" class="capture-logs"></div>
+      </section>
     </main>
     <script type="module" src="index.js"></script>
   </body>
