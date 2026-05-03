@@ -221,7 +221,7 @@ async function buildPayload(reason: 'command' | 'popup' | 'auto'): Promise<Captu
 }
 
 
-async function sendLifecycleLog(status: string, reason: 'command' | 'popup' | 'auto', detail: string, payload?: Partial<CapturePayload>): Promise<void> {
+async function sendLifecycleLog(captureId: string, status: string, reason: 'command' | 'popup' | 'auto', detail: string, payload?: Partial<CapturePayload>): Promise<void> {
   try {
     const settings = await getSettings();
     const endpoint = new URL('/api/capture-logs', settings.backendBaseUrl).toString();
@@ -235,7 +235,7 @@ async function sendLifecycleLog(status: string, reason: 'command' | 'popup' | 'a
         reason,
         status,
         detail,
-        captureId: `${Date.now()}`,
+        captureId,
         url: payload?.url ?? '',
         title: payload?.title ?? '',
         hasHtml: Boolean(payload?.html),
@@ -332,9 +332,9 @@ async function flushQueue(): Promise<void> {
         message: 'Uploading capture to server.',
         createdAt: new Date().toISOString()
       });
-      await sendLifecycleLog('upload-started', item.payload.reason, 'Uploading capture to backend.', item.payload);
+      await sendLifecycleLog(item.id, 'upload-started', item.payload.reason, 'Uploading capture to backend.', item.payload);
       await postPayload(item.payload);
-      await sendLifecycleLog('saved', item.payload.reason, 'Capture saved successfully.', item.payload);
+      await sendLifecycleLog(item.id, 'saved', item.payload.reason, 'Capture saved successfully.', item.payload);
       await appendCaptureLog({
         id: item.id,
         url: item.payload.url,
@@ -351,7 +351,7 @@ async function flushQueue(): Promise<void> {
       const nextRetryAt = Date.now() + computeBackoffMs(attempts);
       const lastError = String(error);
       remain.push({ ...item, attempts, nextRetryAt, lastError });
-      await sendLifecycleLog('unable-to-save', item.payload.reason, lastError, item.payload);
+      await sendLifecycleLog(item.id, 'unable-to-save', item.payload.reason, lastError, item.payload);
       const current = await getSettings();
       const cat = categorizeError(error);
       await setSettings({
@@ -395,11 +395,12 @@ async function captureAndQueue(reason: 'command' | 'popup' | 'auto'): Promise<vo
   }
   isCapturing = true;
   try {
-    await sendLifecycleLog('capture-started', reason, 'Capture requested by user or scheduler.');
+    const captureId = crypto.randomUUID();
+    await sendLifecycleLog(captureId, 'capture-started', reason, 'Capture requested by user or scheduler.');
     const payload = await buildPayload(reason);
-    await sendLifecycleLog('capture-built', reason, 'Payload assembled.', payload);
+    await sendLifecycleLog(captureId, 'capture-built', reason, 'Payload assembled.', payload);
     const queue = await getQueue();
-    const id = `${Date.now()}-${Math.random()}`;
+    const id = captureId;
     queue.push({ id, payload, attempts: 0, nextRetryAt: Date.now() });
     await appendCaptureLog({
       id,
@@ -411,7 +412,7 @@ async function captureAndQueue(reason: 'command' | 'popup' | 'auto'): Promise<vo
       createdAt: new Date().toISOString()
     });
     await setQueue(queue);
-    await sendLifecycleLog('queued', reason, 'Capture queued for upload.', payload);
+    await sendLifecycleLog(captureId, 'queued', reason, 'Capture queued for upload.', payload);
     await flushQueue();
   } catch (error) {
     const current = await getSettings();
