@@ -1,5 +1,5 @@
 import { APP_CONFIG } from '../config';
-import type { AuthResponse, FetchCapturesResponse } from '../types/api';
+import type { AuthResponse, FetchCaptureLogsResponse, FetchCapturesResponse } from '../types/api';
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
@@ -55,6 +55,14 @@ export async function loginWithGoogle(idToken: string) {
 
 export async function fetchCaptures(token: string) {
   const data = await request<FetchCapturesResponse>('/api/captures', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data.items;
+}
+
+
+export async function fetchCaptureLogs(token: string) {
+  const data = await request<FetchCaptureLogsResponse>('/api/capture-logs', {
     headers: { Authorization: `Bearer ${token}` },
   });
   return data.items;

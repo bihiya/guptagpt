@@ -127,6 +127,20 @@ async function setQueue(queue: QueueItem[]): Promise<void> {
   await setSettings({ pendingUploads: queue.length });
 }
 
+async function cancelQueueItem(id: string): Promise<boolean> {
+  const queue = await getQueue();
+  const next = queue.filter((item) => item.id !== id);
+  const removed = next.length !== queue.length;
+  if (removed) await setQueue(next);
+  return removed;
+}
+
+async function cancelAllQueued(): Promise<number> {
+  const queue = await getQueue();
+  await setQueue([]);
+  return queue.length;
+}
+
 async function getActiveTab(): Promise<chrome.tabs.Tab> {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   const tab = tabs[0];
@@ -204,6 +218,35 @@ async function buildPayload(reason: 'command' | 'popup' | 'auto'): Promise<Captu
   };
 
   return payload;
+}
+
+
+async function sendLifecycleLog(status: string, reason: 'command' | 'popup' | 'auto', detail: string, payload?: Partial<CapturePayload>): Promise<void> {
+  try {
+    const settings = await getSettings();
+    const endpoint = new URL('/api/capture-logs', settings.backendBaseUrl).toString();
+    await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(settings.authToken ? { Authorization: `Bearer ${settings.authToken}` } : {})
+      },
+      body: JSON.stringify({
+        reason,
+        status,
+        detail,
+        captureId: `${Date.now()}`,
+        url: payload?.url ?? '',
+        title: payload?.title ?? '',
+        hasHtml: Boolean(payload?.html),
+        hasSourceCode: Boolean(payload?.sourceCode),
+        hasScreenshot: Boolean(payload?.screenshotBase64),
+        hasPdf: Boolean(payload?.pdfBase64)
+      })
+    });
+  } catch {
+    // avoid breaking capture flow for log failures
+  }
 }
 
 async function postPayload(payload: CapturePayload): Promise<void> {
@@ -289,7 +332,9 @@ async function flushQueue(): Promise<void> {
         message: 'Uploading capture to server.',
         createdAt: new Date().toISOString()
       });
+      await sendLifecycleLog('upload-started', item.payload.reason, 'Uploading capture to backend.', item.payload);
       await postPayload(item.payload);
+      await sendLifecycleLog('saved', item.payload.reason, 'Capture saved successfully.', item.payload);
       await appendCaptureLog({
         id: item.id,
         url: item.payload.url,
@@ -306,6 +351,7 @@ async function flushQueue(): Promise<void> {
       const nextRetryAt = Date.now() + computeBackoffMs(attempts);
       const lastError = String(error);
       remain.push({ ...item, attempts, nextRetryAt, lastError });
+      await sendLifecycleLog('unable-to-save', item.payload.reason, lastError, item.payload);
       const current = await getSettings();
       const cat = categorizeError(error);
       await setSettings({
@@ -349,7 +395,9 @@ async function captureAndQueue(reason: 'command' | 'popup' | 'auto'): Promise<vo
   }
   isCapturing = true;
   try {
+    await sendLifecycleLog('capture-started', reason, 'Capture requested by user or scheduler.');
     const payload = await buildPayload(reason);
+    await sendLifecycleLog('capture-built', reason, 'Payload assembled.', payload);
     const queue = await getQueue();
     const id = `${Date.now()}-${Math.random()}`;
     queue.push({ id, payload, attempts: 0, nextRetryAt: Date.now() });
@@ -363,6 +411,7 @@ async function captureAndQueue(reason: 'command' | 'popup' | 'auto'): Promise<vo
       createdAt: new Date().toISOString()
     });
     await setQueue(queue);
+    await sendLifecycleLog('queued', reason, 'Capture queued for upload.', payload);
     await flushQueue();
   } catch (error) {
     const current = await getSettings();
@@ -501,6 +550,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === 'HEALTH_CHECK') {
     healthCheck().then((res) => sendResponse(res)).catch((error: unknown) => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+
+  if (message.type === 'GET_QUEUE_ITEMS') {
+    getQueue().then((items) => sendResponse({ ok: true, items })).catch((error: unknown) => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+
+  if (message.type === 'CANCEL_QUEUE_ITEM') {
+    cancelQueueItem(String(message.id ?? ''))
+      .then((removed) => sendResponse(removed ? { ok: true } : { ok: false, error: 'Queue item not found' }))
+      .catch((error: unknown) => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+
+  if (message.type === 'CANCEL_ALL_QUEUED') {
+    cancelAllQueued().then((count) => sendResponse({ ok: true, count })).catch((error: unknown) => sendResponse({ ok: false, error: String(error) }));
     return true;
   }
 

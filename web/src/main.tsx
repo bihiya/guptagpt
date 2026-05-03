@@ -10,6 +10,7 @@ import './styles.css';
 const App = lazy(() => import('./pages/App').then((module) => ({ default: module.App })));
 const AuthPage = lazy(() => import('./pages/AuthPage').then((module) => ({ default: module.AuthPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })));
+const LogsPage = lazy(() => import('./pages/LogsPage').then((module) => ({ default: module.LogsPage })));
 
 function RootPage() {
   const pathname = usePathname();
@@ -17,6 +18,7 @@ function RootPage() {
   if (pathname === '/login') return <AuthPage mode="login" />;
   if (pathname === '/signup') return <AuthPage mode="signup" />;
   if (pathname === '/settings') return <SettingsPage />;
+  if (pathname === '/logs') return <LogsPage />;
   return <App />;
 }
 
