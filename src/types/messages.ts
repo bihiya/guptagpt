@@ -15,6 +15,7 @@ export interface CaptureDataMessage {
 }
 
 export interface CapturePayload {
+  captureId?: string;
   url: string;
   title: string;
   html: string;

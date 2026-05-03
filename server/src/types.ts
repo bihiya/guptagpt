@@ -1,4 +1,5 @@
 export interface CaptureRequestBody {
+  captureId?: string;
   url: string;
   title: string;
   html: string;

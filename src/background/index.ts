@@ -27,6 +27,9 @@ async function appendCaptureLog(entry: CaptureLogEntry): Promise<void> {
 
 const MAX_SCREENSHOT_BYTES = 1_500_000;
 const MIN_SCREENSHOT_CAPTURE_INTERVAL_MS = 1200;
+const REQUEST_TIMEOUT_MS = 20000;
+const MAX_QUEUE_ITEMS = 100;
+const MAX_QUEUE_ITEM_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function estimateBase64Bytes(base64: string): number {
   return Math.floor((base64.length * 3) / 4);
@@ -85,6 +88,11 @@ function categorizeError(error: unknown): string {
   return 'other';
 }
 
+function isAuthFailure(error: unknown): boolean {
+  const message = String(error).toLowerCase();
+  return message.includes('status 401') || message.includes('status 403');
+}
+
 function isCapturePermissionError(error: unknown): boolean {
   const message = String(error).toLowerCase();
   return message.includes("'<all_urls>'") || message.includes('activetab') || message.includes('permission');
@@ -119,12 +127,33 @@ type QueueItem = {
 
 async function getQueue(): Promise<QueueItem[]> {
   const data = await chrome.storage.local.get(QUEUE_KEY);
-  return (data[QUEUE_KEY] as QueueItem[] | undefined) ?? [];
+  const queue = (data[QUEUE_KEY] as QueueItem[] | undefined) ?? [];
+  const now = Date.now();
+  return queue.filter((item) => now - Number(item.payload.timestamp ? Date.parse(item.payload.timestamp) : now) <= MAX_QUEUE_ITEM_AGE_MS);
 }
 
 async function setQueue(queue: QueueItem[]): Promise<void> {
-  await chrome.storage.local.set({ [QUEUE_KEY]: queue });
-  await setSettings({ pendingUploads: queue.length });
+  const now = Date.now();
+  const filtered = queue
+    .filter((item) => now - Number(item.payload.timestamp ? Date.parse(item.payload.timestamp) : now) <= MAX_QUEUE_ITEM_AGE_MS)
+    .slice(-MAX_QUEUE_ITEMS);
+  await chrome.storage.local.set({ [QUEUE_KEY]: filtered });
+  await setSettings({ pendingUploads: filtered.length });
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = self.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function cancelQueueItem(id: string): Promise<boolean> {
@@ -157,7 +186,7 @@ async function buildPayload(reason: 'command' | 'popup' | 'auto'): Promise<Captu
   let captureData: CaptureDataMessage;
   try {
     captureData = (await chrome.tabs.sendMessage(tabId, { type: 'CAPTURE_REQUEST', reason })) as CaptureDataMessage;
-  } catch {
+  } catch (error) {
     const result = await chrome.scripting.executeScript({
       target: { tabId },
       func: (nextReason: 'command' | 'popup' | 'auto') => {
@@ -176,13 +205,11 @@ async function buildPayload(reason: 'command' | 'popup' | 'auto'): Promise<Captu
       args: [reason]
     });
     const fallbackPayload = result[0]?.result;
-    if (!fallbackPayload) throw new Error('Unable to read page HTML from active tab.');
+    if (!fallbackPayload) throw new Error(`Unable to read page HTML from active tab. Content script and fallback both failed: ${String(error)}`);
     captureData = fallbackPayload;
   }
 
   const fullHtml = captureData.html ?? '';
-  const cappedHtml = fullHtml.slice(0, settings.maxHtmlSizeBytes);
-  const truncated = cappedHtml.length < fullHtml.length;
   let screenshotBase64 = '';
   if (!settings.metadataOnlyMode && settings.includeImage) {
     try {
@@ -206,15 +233,15 @@ async function buildPayload(reason: 'command' | 'popup' | 'auto'): Promise<Captu
   const payload: CapturePayload = {
     url: captureData.url,
     title: captureData.title,
-    html: settings.metadataOnlyMode || !settings.includeHtml ? '' : cappedHtml,
-    sourceCode: settings.metadataOnlyMode || !settings.includeSourceCode ? '' : cappedHtml,
+    html: settings.metadataOnlyMode || !settings.includeHtml ? '' : fullHtml,
+    sourceCode: settings.metadataOnlyMode || !settings.includeSourceCode ? '' : (captureData.sourceCode ?? fullHtml),
     screenshotBase64,
     pdfBase64,
     timestamp: captureData.timestamp,
     reason,
     metadataOnly: settings.metadataOnlyMode,
     compressed: true,
-    truncated
+    truncated: false
   };
 
   return payload;
@@ -225,7 +252,7 @@ async function sendLifecycleLog(captureId: string, status: string, reason: 'comm
   try {
     const settings = await getSettings();
     const endpoint = new URL('/api/capture-logs', settings.backendBaseUrl).toString();
-    await fetch(endpoint, {
+    await fetchWithTimeout(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -261,7 +288,7 @@ async function postPayload(payload: CapturePayload): Promise<void> {
     }
   });
 
-  const sendPayload = async (nextPayload: CapturePayload): Promise<Response> => fetch(endpoint, {
+  const sendPayload = async (nextPayload: CapturePayload): Promise<Response> => fetchWithTimeout(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -348,9 +375,22 @@ async function flushQueue(): Promise<void> {
     } catch (error) {
       isCapturing = false;
       const attempts = item.attempts + 1;
-      const nextRetryAt = Date.now() + computeBackoffMs(attempts);
       const lastError = String(error);
-      remain.push({ ...item, attempts, nextRetryAt, lastError });
+      const authFailure = isAuthFailure(error);
+      if (authFailure && attempts >= 2) {
+        await appendCaptureLog({
+          id: item.id,
+          url: item.payload.url,
+          title: item.payload.title,
+          reason: item.payload.reason,
+          status: 'failed',
+          message: 'Authentication failed repeatedly; queued upload paused until re-authentication.',
+          createdAt: new Date().toISOString()
+        });
+      } else {
+        const nextRetryAt = Date.now() + computeBackoffMs(attempts);
+        remain.push({ ...item, attempts, nextRetryAt, lastError });
+      }
       await sendLifecycleLog(item.id, 'unable-to-save', item.payload.reason, lastError, item.payload);
       const current = await getSettings();
       const cat = categorizeError(error);
@@ -401,6 +441,7 @@ async function captureAndQueue(reason: 'command' | 'popup' | 'auto'): Promise<vo
     await sendLifecycleLog(captureId, 'capture-built', reason, 'Payload assembled.', payload);
     const queue = await getQueue();
     const id = captureId;
+    payload.captureId = id;
     queue.push({ id, payload, attempts: 0, nextRetryAt: Date.now() });
     await appendCaptureLog({
       id,
